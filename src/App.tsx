@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
+import { listen } from "@tauri-apps/api/event";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import "./App.css";
@@ -86,6 +87,21 @@ function App() {
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
   }, []);
+
+  // Listen for file open events from OS (double-click .md, drag to dock icon)
+  useEffect(() => {
+    const unlisten = listen<string>("open-file", async (event) => {
+      try {
+        const filePath = event.payload;
+        const content = await readTextFile(filePath);
+        const name = filePath.split("/").pop() || filePath;
+        loadContent(name, content);
+      } catch (err) {
+        console.error("Failed to open file:", err);
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [loadContent]);
 
   // Cmd+T (new tab / open file), Cmd+W (close tab)
   useEffect(() => {

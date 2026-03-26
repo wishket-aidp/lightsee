@@ -33,6 +33,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown", "mdown", "mkd", "mdwn"],
+        "mimeType": "text/markdown",
+        "description": "Markdown Document",
+        "role": "Viewer"
+      }
+    ],
     "macOS": {
       "signingIdentity": "Developer ID Application: Wishket Co., Ltd. (N9TVH7WV9T)"
     }
