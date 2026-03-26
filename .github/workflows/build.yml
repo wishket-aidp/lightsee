@@ -63,7 +63,7 @@ jobs:
         if: runner.os == 'macOS'
         env:
           TARGET: ${{ matrix.target }}
-          APPLE_SIGNING_IDENTITY: "Developer ID Application: WISHKET INC (N9TVH7WV9T)"
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: Wishket Co., Ltd. (N9TVH7WV9T)"
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
