@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
@@ -55,7 +55,7 @@ function App() {
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const [updateAvailable, setUpdateAvailable] = useState<Awaited<ReturnType<typeof check>> | null>(null);
   const [updating, setUpdating] = useState(false);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const settingsLoaded = useRef(false);
 
   const currentTheme = themes[theme];
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
@@ -77,7 +77,7 @@ function App() {
         const win = getCurrentWindow();
         await win.setSize(new LogicalSize(savedWindow.width, savedWindow.height));
       }
-      setSettingsLoaded(true);
+      settingsLoaded.current = true;
     })();
   }, []);
 
@@ -120,7 +120,7 @@ function App() {
 
   // Save settings to store on change (only after initial load)
   useEffect(() => {
-    if (!settingsLoaded) return;
+    if (!settingsLoaded.current) return;
     (async () => {
       const store = await load("settings.json");
       await store.set("theme", theme);
@@ -128,7 +128,7 @@ function App() {
       await store.set("recentFiles", recentFiles);
       await store.save();
     })();
-  }, [theme, fontSize, recentFiles, settingsLoaded]);
+  }, [theme, fontSize, recentFiles]);
 
   const addRecentFile = useCallback((filePath: string) => {
     setRecentFiles((prev) => {
