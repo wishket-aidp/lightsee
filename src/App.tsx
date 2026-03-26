@@ -5,6 +5,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { load } from "@tauri-apps/plugin-store";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import "./App.css";
@@ -51,6 +53,8 @@ function App() {
   const [fontSize, setFontSize] = useState(16);
   const [showThemePanel, setShowThemePanel] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   const currentTheme = themes[theme];
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
@@ -73,6 +77,26 @@ function App() {
         await win.setSize(new LogicalSize(savedWindow.width, savedWindow.height));
       }
     })();
+  }, []);
+
+  // Check for updates on mount
+  useEffect(() => {
+    check().then((update) => {
+      if (update) setUpdateVersion(update.version);
+    }).catch(() => {});
+  }, []);
+
+  const doUpdate = useCallback(async () => {
+    setUpdating(true);
+    try {
+      const update = await check();
+      if (update) {
+        await update.downloadAndInstall();
+        await relaunch();
+      }
+    } catch {
+      setUpdating(false);
+    }
   }, []);
 
   // Save window size on resize (debounced, using logical size)
@@ -236,6 +260,16 @@ function App() {
           </button>
         </div>
         <div className="toolbar-right">
+          {updateVersion && (
+            <button
+              className="btn btn-update"
+              style={{ color: "#fff", backgroundColor: currentTheme.link, borderColor: currentTheme.link }}
+              onClick={doUpdate}
+              disabled={updating}
+            >
+              {updating ? "Updating..." : `Update ${updateVersion}`}
+            </button>
+          )}
           <div className="font-size-controls" style={{ display: "flex", alignItems: "center", gap: "4px", marginRight: "8px" }}>
             <button className="btn btn-sm" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={() => setFontSize((s) => Math.max(s - 2, 10))}>A-</button>
             <span style={{ fontSize: "12px", minWidth: "28px", textAlign: "center" }}>{fontSize}px</span>
