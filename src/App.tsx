@@ -101,7 +101,8 @@ function App() {
 
   const loadContent = useCallback((fileName: string, markdown: string, filePath?: string) => {
     const raw = marked.parse(markdown, { async: false }) as string;
-    const html = DOMPurify.sanitize(raw);
+    const sanitized = DOMPurify.sanitize(raw);
+    const html = sanitized.replace(/<table([\s\S]*?<\/table>)/g, '<div class="table-wrapper"><table$1</div>');
     const id = `tab-${++tabIdCounter}`;
     setTabs((prev) => [...prev, { id, fileName, filePath, html }]);
     setActiveTabId(id);

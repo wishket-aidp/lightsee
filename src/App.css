@@ -153,7 +153,7 @@ html, body, #root {
 }
 
 .markdown-body {
-  max-width: 760px;
+  max-width: 960px;
   margin: 0 auto;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -276,21 +276,34 @@ html, body, #root {
   margin: 2em 0;
 }
 
-.markdown-body table {
-  width: 100%;
-  border-collapse: collapse;
+.markdown-body .table-wrapper {
+  overflow-x: auto;
+  margin-left: calc(-1 * (100vw - 100%) / 2);
+  margin-right: calc(-1 * (100vw - 100%) / 2);
+  padding-left: calc((100vw - 100%) / 2);
+  padding-right: calc((100vw - 100%) / 2);
   margin-bottom: 1em;
+  -webkit-overflow-scrolling: touch;
+}
+
+.markdown-body table {
+  min-width: 100%;
+  width: max-content;
+  border-collapse: collapse;
 }
 
 .markdown-body th, .markdown-body td {
   border: 1px solid var(--border-color);
   padding: 8px 12px;
   text-align: left;
+  white-space: nowrap;
 }
 
 .markdown-body th {
   background: var(--code-bg);
   font-weight: 600;
+  position: sticky;
+  top: 0;
 }
 
 .markdown-body strong {
