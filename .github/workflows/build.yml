@@ -120,8 +120,7 @@ jobs:
           name: Lightsee-${{ matrix.label }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
-            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.nsis.zip
-            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.nsis.zip.sig
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe.sig
 
       - name: Cleanup keychain
         if: runner.os == 'macOS' && always()
@@ -163,14 +162,14 @@ jobs:
           [ -n "$X64_TAR" ] && cp "$X64_TAR" artifacts/Lightsee_x64.app.tar.gz
           [ -n "$X64_SIG" ] && cp "$X64_SIG" artifacts/Lightsee_x64.app.tar.gz.sig
 
-          # Flatten Windows nsis artifacts
-          WIN_ZIP=$(find artifacts/Lightsee-Windows-x64 -name "*.nsis.zip" ! -name "*.sig" | head -1)
-          WIN_ZIP_SIG=$(find artifacts/Lightsee-Windows-x64 -name "*.nsis.zip.sig" | head -1)
-          [ -n "$WIN_ZIP" ] && cp "$WIN_ZIP" artifacts/
-          [ -n "$WIN_ZIP_SIG" ] && cp "$WIN_ZIP_SIG" artifacts/
+          # Flatten Windows updater artifacts (.exe + .exe.sig)
+          WIN_EXE=$(find artifacts/Lightsee-Windows-x64 -name "*-setup.exe" ! -name "*.sig" | head -1)
+          WIN_EXE_SIG=$(find artifacts/Lightsee-Windows-x64 -name "*-setup.exe.sig" | head -1)
+          [ -n "$WIN_EXE" ] && cp "$WIN_EXE" artifacts/
+          [ -n "$WIN_EXE_SIG" ] && cp "$WIN_EXE_SIG" artifacts/
 
           echo "=== Prepared artifacts ==="
-          ls -la artifacts/*.tar.gz artifacts/*.sig artifacts/*.nsis.zip 2>/dev/null || echo "Some artifacts missing"
+          ls -la artifacts/*.tar.gz artifacts/*.sig artifacts/*-setup.exe artifacts/*-setup.exe.sig 2>/dev/null || echo "Some artifacts missing"
 
       - name: Generate latest.json
         run: |
@@ -183,9 +182,9 @@ jobs:
           WIN_SIG=""
           [ -f "artifacts/Lightsee_aarch64.app.tar.gz.sig" ] && MAC_ARM64_SIG=$(cat "artifacts/Lightsee_aarch64.app.tar.gz.sig")
           [ -f "artifacts/Lightsee_x64.app.tar.gz.sig" ] && MAC_X64_SIG=$(cat "artifacts/Lightsee_x64.app.tar.gz.sig")
-          WIN_SIG_FILE=$(find artifacts -maxdepth 1 -name "*.nsis.zip.sig" | head -1)
+          WIN_SIG_FILE=$(find artifacts -maxdepth 1 -name "*-setup.exe.sig" | head -1)
           [ -n "$WIN_SIG_FILE" ] && WIN_SIG=$(cat "$WIN_SIG_FILE")
-          WIN_ZIP=$(find artifacts -maxdepth 1 -name "*.nsis.zip" ! -name "*.sig" | head -1 | xargs basename 2>/dev/null || echo "")
+          WIN_EXE=$(find artifacts -maxdepth 1 -name "*-setup.exe" ! -name "*.sig" | head -1 | xargs basename 2>/dev/null || echo "")
 
           cat > artifacts/latest.json << ENDJSON
           {
@@ -203,7 +202,7 @@ jobs:
               },
               "windows-x86_64": {
                 "signature": "$WIN_SIG",
-                "url": "$BASE_URL/$WIN_ZIP"
+                "url": "$BASE_URL/$WIN_EXE"
               }
             }
           }
@@ -221,8 +220,7 @@ jobs:
           cp artifacts/Lightsee_aarch64.app.tar.gz.sig release-files/ 2>/dev/null || true
           cp artifacts/Lightsee_x64.app.tar.gz release-files/ 2>/dev/null || true
           cp artifacts/Lightsee_x64.app.tar.gz.sig release-files/ 2>/dev/null || true
-          cp artifacts/*.nsis.zip release-files/ 2>/dev/null || true
-          cp artifacts/*.nsis.zip.sig release-files/ 2>/dev/null || true
+          cp artifacts/*-setup.exe.sig release-files/ 2>/dev/null || true
           cp artifacts/latest.json release-files/
           echo "=== Release files ==="
           ls -la release-files/
