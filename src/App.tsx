@@ -53,7 +53,7 @@ function App() {
   const [fontSize, setFontSize] = useState(16);
   const [showThemePanel, setShowThemePanel] = useState(false);
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
-  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState<Awaited<ReturnType<typeof check>> | null>(null);
   const [updating, setUpdating] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -84,22 +84,20 @@ function App() {
   // Check for updates on mount
   useEffect(() => {
     check().then((update) => {
-      if (update) setUpdateVersion(update.version);
+      if (update) setUpdateAvailable(update);
     }).catch(() => {});
   }, []);
 
   const doUpdate = useCallback(async () => {
+    if (!updateAvailable) return;
     setUpdating(true);
     try {
-      const update = await check();
-      if (update) {
-        await update.downloadAndInstall();
-        await relaunch();
-      }
+      await updateAvailable.downloadAndInstall();
+      await relaunch();
     } catch {
       setUpdating(false);
     }
-  }, []);
+  }, [updateAvailable]);
 
   // Save window size on resize (debounced, using logical size)
   useEffect(() => {
@@ -263,14 +261,14 @@ function App() {
           </button>
         </div>
         <div className="toolbar-right">
-          {updateVersion && (
+          {updateAvailable && (
             <button
               className="btn btn-update"
               style={{ color: "#fff", backgroundColor: currentTheme.link, borderColor: currentTheme.link }}
               onClick={doUpdate}
               disabled={updating}
             >
-              {updating ? "Updating..." : `Update ${updateVersion}`}
+              {updating ? "Updating..." : `Update ${updateAvailable.version}`}
             </button>
           )}
           <div className="font-size-controls" style={{ display: "flex", alignItems: "center", gap: "4px", marginRight: "8px" }}>
