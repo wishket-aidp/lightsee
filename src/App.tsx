@@ -55,6 +55,7 @@ function App() {
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const currentTheme = themes[theme];
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
@@ -76,6 +77,7 @@ function App() {
         const win = getCurrentWindow();
         await win.setSize(new LogicalSize(savedWindow.width, savedWindow.height));
       }
+      setSettingsLoaded(true);
     })();
   }, []);
 
@@ -118,8 +120,9 @@ function App() {
     return () => { clearTimeout(timer); unlisten.then((fn) => fn()); };
   }, []);
 
-  // Save settings to store on change
+  // Save settings to store on change (only after initial load)
   useEffect(() => {
+    if (!settingsLoaded) return;
     (async () => {
       const store = await load("settings.json");
       await store.set("theme", theme);
@@ -127,7 +130,7 @@ function App() {
       await store.set("recentFiles", recentFiles);
       await store.save();
     })();
-  }, [theme, fontSize, recentFiles]);
+  }, [theme, fontSize, recentFiles, settingsLoaded]);
 
   const addRecentFile = useCallback((filePath: string) => {
     setRecentFiles((prev) => {
