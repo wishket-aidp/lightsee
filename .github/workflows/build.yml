@@ -147,24 +147,30 @@ jobs:
         with:
           path: artifacts
 
-      - name: Rename updater artifacts to include architecture
+      - name: Debug and prepare updater artifacts
         run: |
-          # artifacts/Lightsee-macOS-arm64/Lightsee.app.tar.gz -> Lightsee_aarch64.app.tar.gz
-          for dir in artifacts/Lightsee-macOS-arm64 artifacts/Lightsee-macOS-x64 artifacts/Lightsee-Windows-x64; do
-            [ -d "$dir" ] || continue
-            echo "=== $dir ==="
-            ls -la "$dir"
-          done
+          echo "=== Full artifact tree ==="
+          find artifacts -type f | sort
 
-          # Rename macOS updater artifacts to distinguish architectures
-          if [ -f "artifacts/Lightsee-macOS-arm64/Lightsee.app.tar.gz" ]; then
-            mv "artifacts/Lightsee-macOS-arm64/Lightsee.app.tar.gz" "artifacts/Lightsee-macOS-arm64/Lightsee_aarch64.app.tar.gz"
-            mv "artifacts/Lightsee-macOS-arm64/Lightsee.app.tar.gz.sig" "artifacts/Lightsee-macOS-arm64/Lightsee_aarch64.app.tar.gz.sig"
-          fi
-          if [ -f "artifacts/Lightsee-macOS-x64/Lightsee.app.tar.gz" ]; then
-            mv "artifacts/Lightsee-macOS-x64/Lightsee.app.tar.gz" "artifacts/Lightsee-macOS-x64/Lightsee_x64.app.tar.gz"
-            mv "artifacts/Lightsee-macOS-x64/Lightsee.app.tar.gz.sig" "artifacts/Lightsee-macOS-x64/Lightsee_x64.app.tar.gz.sig"
-          fi
+          # Flatten and rename macOS updater artifacts
+          ARM64_TAR=$(find artifacts/Lightsee-macOS-arm64 -name "*.app.tar.gz" ! -name "*.sig" | head -1)
+          ARM64_SIG=$(find artifacts/Lightsee-macOS-arm64 -name "*.app.tar.gz.sig" | head -1)
+          X64_TAR=$(find artifacts/Lightsee-macOS-x64 -name "*.app.tar.gz" ! -name "*.sig" | head -1)
+          X64_SIG=$(find artifacts/Lightsee-macOS-x64 -name "*.app.tar.gz.sig" | head -1)
+
+          [ -n "$ARM64_TAR" ] && cp "$ARM64_TAR" artifacts/Lightsee_aarch64.app.tar.gz
+          [ -n "$ARM64_SIG" ] && cp "$ARM64_SIG" artifacts/Lightsee_aarch64.app.tar.gz.sig
+          [ -n "$X64_TAR" ] && cp "$X64_TAR" artifacts/Lightsee_x64.app.tar.gz
+          [ -n "$X64_SIG" ] && cp "$X64_SIG" artifacts/Lightsee_x64.app.tar.gz.sig
+
+          # Flatten Windows nsis artifacts
+          WIN_ZIP=$(find artifacts/Lightsee-Windows-x64 -name "*.nsis.zip" ! -name "*.sig" | head -1)
+          WIN_ZIP_SIG=$(find artifacts/Lightsee-Windows-x64 -name "*.nsis.zip.sig" | head -1)
+          [ -n "$WIN_ZIP" ] && cp "$WIN_ZIP" artifacts/
+          [ -n "$WIN_ZIP_SIG" ] && cp "$WIN_ZIP_SIG" artifacts/
+
+          echo "=== Prepared artifacts ==="
+          ls -la artifacts/*.tar.gz artifacts/*.sig artifacts/*.nsis.zip 2>/dev/null || echo "Some artifacts missing"
 
       - name: Generate latest.json
         run: |
@@ -172,17 +178,14 @@ jobs:
           REPO="wishket-aidp/lightsee"
           BASE_URL="https://github.com/$REPO/releases/download/$VERSION"
 
-          # Read signatures
           MAC_ARM64_SIG=""
           MAC_X64_SIG=""
           WIN_SIG=""
-          [ -f "artifacts/Lightsee-macOS-arm64/Lightsee_aarch64.app.tar.gz.sig" ] && MAC_ARM64_SIG=$(cat "artifacts/Lightsee-macOS-arm64/Lightsee_aarch64.app.tar.gz.sig")
-          [ -f "artifacts/Lightsee-macOS-x64/Lightsee_x64.app.tar.gz.sig" ] && MAC_X64_SIG=$(cat "artifacts/Lightsee-macOS-x64/Lightsee_x64.app.tar.gz.sig")
-          WIN_SIG_FILE=$(find artifacts/Lightsee-Windows-x64 -name "*.nsis.zip.sig" 2>/dev/null | head -1)
+          [ -f "artifacts/Lightsee_aarch64.app.tar.gz.sig" ] && MAC_ARM64_SIG=$(cat "artifacts/Lightsee_aarch64.app.tar.gz.sig")
+          [ -f "artifacts/Lightsee_x64.app.tar.gz.sig" ] && MAC_X64_SIG=$(cat "artifacts/Lightsee_x64.app.tar.gz.sig")
+          WIN_SIG_FILE=$(find artifacts -maxdepth 1 -name "*.nsis.zip.sig" | head -1)
           [ -n "$WIN_SIG_FILE" ] && WIN_SIG=$(cat "$WIN_SIG_FILE")
-
-          # Get Windows nsis.zip filename
-          WIN_ZIP=$(find artifacts/Lightsee-Windows-x64 -name "*.nsis.zip" ! -name "*.sig" 2>/dev/null | head -1 | xargs basename 2>/dev/null || echo "")
+          WIN_ZIP=$(find artifacts -maxdepth 1 -name "*.nsis.zip" ! -name "*.sig" | head -1 | xargs basename 2>/dev/null || echo "")
 
           cat > artifacts/latest.json << ENDJSON
           {
@@ -206,9 +209,27 @@ jobs:
           }
           ENDJSON
 
+      - name: Collect release files
+        run: |
+          mkdir -p release-files
+          # DMGs
+          find artifacts -name "*.dmg" -exec cp {} release-files/ \;
+          # Windows installer
+          find artifacts -name "*-setup.exe" -exec cp {} release-files/ \;
+          # Updater artifacts (already flattened to artifacts/)
+          cp artifacts/Lightsee_aarch64.app.tar.gz release-files/ 2>/dev/null || true
+          cp artifacts/Lightsee_aarch64.app.tar.gz.sig release-files/ 2>/dev/null || true
+          cp artifacts/Lightsee_x64.app.tar.gz release-files/ 2>/dev/null || true
+          cp artifacts/Lightsee_x64.app.tar.gz.sig release-files/ 2>/dev/null || true
+          cp artifacts/*.nsis.zip release-files/ 2>/dev/null || true
+          cp artifacts/*.nsis.zip.sig release-files/ 2>/dev/null || true
+          cp artifacts/latest.json release-files/
+          echo "=== Release files ==="
+          ls -la release-files/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
-          files: artifacts/**/*
+          files: release-files/*
           generate_release_notes: true
