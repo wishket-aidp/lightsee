@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LogicalSize } from "@tauri-apps/api/dpi";
+import { load } from "@tauri-apps/plugin-store";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import "./App.css";
@@ -22,6 +25,7 @@ type ThemeKey = keyof typeof themes;
 interface Tab {
   id: string;
   fileName: string;
+  filePath?: string;
   html: string;
 }
 
@@ -30,25 +34,77 @@ let tabIdCounter = 0;
 function App() {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<ThemeKey>(() => {
-    return (localStorage.getItem("lightsee-theme") as ThemeKey) || "light";
-  });
+  const [theme, setTheme] = useState<ThemeKey>("light");
+  const [fontSize, setFontSize] = useState(16);
   const [showThemePanel, setShowThemePanel] = useState(false);
+  const [recentFiles, setRecentFiles] = useState<string[]>([]);
 
   const currentTheme = themes[theme];
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
 
+  // Load settings from store on mount
   useEffect(() => {
-    localStorage.setItem("lightsee-theme", theme);
-  }, [theme]);
+    (async () => {
+      const store = await load("settings.json");
+      const savedTheme = await store.get<ThemeKey>("theme");
+      if (savedTheme && savedTheme in themes) setTheme(savedTheme);
+      const savedFontSize = await store.get<number>("fontSize");
+      if (savedFontSize) setFontSize(savedFontSize);
+      const savedRecent = await store.get<string[]>("recentFiles");
+      if (savedRecent) setRecentFiles(savedRecent);
 
-  const loadContent = useCallback((fileName: string, markdown: string) => {
+      // Restore window size
+      const savedWindow = await store.get<{ width: number; height: number }>("windowSize");
+      if (savedWindow) {
+        const win = getCurrentWindow();
+        await win.setSize(new LogicalSize(savedWindow.width, savedWindow.height));
+      }
+    })();
+  }, []);
+
+  // Save window size on resize
+  useEffect(() => {
+    const win = getCurrentWindow();
+    const unlisten = win.onResized(async (event) => {
+      const store = await load("settings.json");
+      await store.set("windowSize", { width: event.payload.width, height: event.payload.height });
+      await store.save();
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  // Save settings to store on change
+  useEffect(() => {
+    (async () => {
+      const store = await load("settings.json");
+      await store.set("theme", theme);
+      await store.set("fontSize", fontSize);
+      await store.set("recentFiles", recentFiles);
+      await store.save();
+    })();
+  }, [theme, fontSize, recentFiles]);
+
+  const addRecentFile = useCallback((filePath: string) => {
+    setRecentFiles((prev) => {
+      const filtered = prev.filter((f) => f !== filePath);
+      return [filePath, ...filtered].slice(0, 10);
+    });
+  }, []);
+
+  const loadContent = useCallback((fileName: string, markdown: string, filePath?: string) => {
     const raw = marked.parse(markdown, { async: false }) as string;
     const html = DOMPurify.sanitize(raw);
     const id = `tab-${++tabIdCounter}`;
-    setTabs((prev) => [...prev, { id, fileName, html }]);
+    setTabs((prev) => [...prev, { id, fileName, filePath, html }]);
     setActiveTabId(id);
-  }, []);
+    if (filePath) addRecentFile(filePath);
+  }, [addRecentFile]);
+
+  const openFilePath = useCallback(async (filePath: string) => {
+    const content = await readTextFile(filePath);
+    const name = filePath.split(/[/\\]/).pop() || filePath;
+    loadContent(name, content, filePath);
+  }, [loadContent]);
 
   const openFile = useCallback(async () => {
     const file = await open({
@@ -56,11 +112,9 @@ function App() {
       filters: [{ name: "Markdown", extensions: ["md", "markdown", "txt"] }],
     });
     if (file) {
-      const content = await readTextFile(file);
-      const name = file.split("/").pop() || file;
-      loadContent(name, content);
+      await openFilePath(file);
     }
-  }, [loadContent]);
+  }, [openFilePath]);
 
   const closeTab = useCallback((id: string) => {
     setTabs((prev) => {
@@ -92,16 +146,13 @@ function App() {
   useEffect(() => {
     const unlisten = listen<string>("open-file", async (event) => {
       try {
-        const filePath = event.payload;
-        const content = await readTextFile(filePath);
-        const name = filePath.split("/").pop() || filePath;
-        loadContent(name, content);
+        await openFilePath(event.payload);
       } catch (err) {
         console.error("Failed to open file:", err);
       }
     });
     return () => { unlisten.then((fn) => fn()); };
-  }, [loadContent]);
+  }, [openFilePath]);
 
   // Cmd+T (new tab / open file), Cmd+W (close tab)
   useEffect(() => {
@@ -113,6 +164,18 @@ function App() {
       if (e.metaKey && e.key === "w") {
         e.preventDefault();
         if (activeTabId) closeTab(activeTabId);
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        setFontSize((s) => Math.min(s + 2, 32));
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "-") {
+        e.preventDefault();
+        setFontSize((s) => Math.max(s - 2, 10));
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+        e.preventDefault();
+        setFontSize(16);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -133,6 +196,11 @@ function App() {
           </button>
         </div>
         <div className="toolbar-right">
+          <div className="font-size-controls" style={{ display: "flex", alignItems: "center", gap: "4px", marginRight: "8px" }}>
+            <button className="btn btn-sm" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={() => setFontSize((s) => Math.max(s - 2, 10))}>A-</button>
+            <span style={{ fontSize: "12px", minWidth: "28px", textAlign: "center" }}>{fontSize}px</span>
+            <button className="btn btn-sm" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={() => setFontSize((s) => Math.min(s + 2, 32))}>A+</button>
+          </div>
           <button
             className="btn"
             style={{ color: currentTheme.text, borderColor: currentTheme.border }}
@@ -192,6 +260,7 @@ function App() {
           <div
             className="markdown-body"
             style={{
+              fontSize: `${fontSize}px`,
               "--heading-color": currentTheme.heading,
               "--link-color": currentTheme.link,
               "--code-bg": currentTheme.codeBg,
@@ -199,13 +268,31 @@ function App() {
               "--blockquote-border": currentTheme.blockquoteBorder,
               "--blockquote-text": currentTheme.blockquoteText,
             } as React.CSSProperties}
-            dangerouslySetInnerHTML={{ __html: activeTab.html }}
+            dangerouslySetInnerHTML={{ __html: activeTab.html }}  // Content is sanitized with DOMPurify in loadContent
           />
         ) : (
           <div className="empty-state">
             <div className="empty-icon">📄</div>
             <p>Drop a markdown file here</p>
             <p className="empty-sub">or press <strong>⌘T</strong> to open a file</p>
+            {recentFiles.length > 0 && (
+              <div className="recent-files" style={{ marginTop: "24px", textAlign: "left", maxWidth: "400px" }}>
+                <p style={{ fontSize: "12px", color: currentTheme.blockquoteText, marginBottom: "8px" }}>Recent Files</p>
+                {recentFiles.map((f) => (
+                  <button
+                    key={f}
+                    className="recent-file-item"
+                    style={{ color: currentTheme.link, borderColor: currentTheme.border }}
+                    onClick={() => openFilePath(f)}
+                  >
+                    {f.split(/[/\\]/).pop()}
+                    <span style={{ fontSize: "11px", color: currentTheme.blockquoteText, marginLeft: "8px" }}>
+                      {f.split(/[/\\]/).slice(0, -1).join("/")}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>

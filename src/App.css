@@ -58,6 +58,12 @@ html, body, #root {
   opacity: 0.7;
 }
 
+.btn-sm {
+  padding: 2px 8px;
+  font-size: 12px;
+  min-width: 28px;
+}
+
 /* Tab Bar */
 .tab-bar {
   display: flex;
@@ -172,6 +178,25 @@ html, body, #root {
 .empty-sub {
   font-size: 14px;
   margin-top: 8px;
+}
+
+.recent-file-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid;
+  padding: 8px 4px;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+
+.recent-file-item:hover {
+  opacity: 0.7;
 }
 
 /* Markdown Styles */
