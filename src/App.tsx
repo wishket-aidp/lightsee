@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { readTextFile } from "@tauri-apps/plugin-fs";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { load } from "@tauri-apps/plugin-store";
@@ -62,15 +62,23 @@ function App() {
     })();
   }, []);
 
-  // Save window size on resize
+  // Save window size on resize (debounced, using logical size)
   useEffect(() => {
     const win = getCurrentWindow();
-    const unlisten = win.onResized(async (event) => {
-      const store = await load("settings.json");
-      await store.set("windowSize", { width: event.payload.width, height: event.payload.height });
-      await store.save();
+    let timer: ReturnType<typeof setTimeout>;
+    const unlisten = win.onResized(async () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const size = await win.innerSize();
+        const factor = await win.scaleFactor();
+        const logicalWidth = Math.round(size.width / factor);
+        const logicalHeight = Math.round(size.height / factor);
+        const store = await load("settings.json");
+        await store.set("windowSize", { width: logicalWidth, height: logicalHeight });
+        await store.save();
+      }, 500);
     });
-    return () => { unlisten.then((fn) => fn()); };
+    return () => { clearTimeout(timer); unlisten.then((fn) => fn()); };
   }, []);
 
   // Save settings to store on change
@@ -101,7 +109,7 @@ function App() {
   }, [addRecentFile]);
 
   const openFilePath = useCallback(async (filePath: string) => {
-    const content = await readTextFile(filePath);
+    const content = await invoke<string>("read_file", { path: filePath });
     const name = filePath.split(/[/\\]/).pop() || filePath;
     loadContent(name, content, filePath);
   }, [loadContent]);
@@ -142,8 +150,19 @@ function App() {
     e.preventDefault();
   }, []);
 
-  // Listen for file open events from OS (double-click .md, drag to dock icon)
+  // Poll for pending files from backend + listen for live events
   useEffect(() => {
+    // Poll pending files (handles startup, open -a, double-click)
+    const pollPending = async () => {
+      const files = await invoke<string[]>("get_pending_files");
+      for (const f of files) {
+        await openFilePath(f);
+      }
+    };
+    pollPending();
+    const interval = setInterval(pollPending, 1000);
+
+    // Also listen for live events (files opened while app is already running)
     const unlisten = listen<string>("open-file", async (event) => {
       try {
         await openFilePath(event.payload);
@@ -151,17 +170,24 @@ function App() {
         console.error("Failed to open file:", err);
       }
     });
-    return () => { unlisten.then((fn) => fn()); };
+
+    return () => {
+      clearInterval(interval);
+      unlisten.then((fn) => fn());
+    };
   }, [openFilePath]);
 
-  // Cmd+T (new tab / open file), Cmd+W (close tab)
+  const isMac = navigator.platform.toUpperCase().includes("MAC");
+
+  // Cmd/Ctrl+T (new tab / open file), Cmd/Ctrl+W (close tab)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey && e.key === "t") {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (mod && e.key === "t") {
         e.preventDefault();
         openFile();
       }
-      if (e.metaKey && e.key === "w") {
+      if (mod && e.key === "w") {
         e.preventDefault();
         if (activeTabId) closeTab(activeTabId);
       }
@@ -274,7 +300,7 @@ function App() {
           <div className="empty-state">
             <div className="empty-icon">📄</div>
             <p>Drop a markdown file here</p>
-            <p className="empty-sub">or press <strong>⌘T</strong> to open a file</p>
+            <p className="empty-sub">or press <strong>{isMac ? "⌘T" : "Ctrl+T"}</strong> to open a file</p>
             {recentFiles.length > 0 && (
               <div className="recent-files" style={{ marginTop: "24px", textAlign: "left", maxWidth: "400px" }}>
                 <p style={{ fontSize: "12px", color: currentTheme.blockquoteText, marginBottom: "8px" }}>Recent Files</p>
