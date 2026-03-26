@@ -146,7 +146,25 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
+
+      - name: Rename updater artifacts to include architecture
+        run: |
+          # artifacts/Lightsee-macOS-arm64/Lightsee.app.tar.gz -> Lightsee_aarch64.app.tar.gz
+          for dir in artifacts/Lightsee-macOS-arm64 artifacts/Lightsee-macOS-x64 artifacts/Lightsee-Windows-x64; do
+            [ -d "$dir" ] || continue
+            echo "=== $dir ==="
+            ls -la "$dir"
+          done
+
+          # Rename macOS updater artifacts to distinguish architectures
+          if [ -f "artifacts/Lightsee-macOS-arm64/Lightsee.app.tar.gz" ]; then
+            mv "artifacts/Lightsee-macOS-arm64/Lightsee.app.tar.gz" "artifacts/Lightsee-macOS-arm64/Lightsee_aarch64.app.tar.gz"
+            mv "artifacts/Lightsee-macOS-arm64/Lightsee.app.tar.gz.sig" "artifacts/Lightsee-macOS-arm64/Lightsee_aarch64.app.tar.gz.sig"
+          fi
+          if [ -f "artifacts/Lightsee-macOS-x64/Lightsee.app.tar.gz" ]; then
+            mv "artifacts/Lightsee-macOS-x64/Lightsee.app.tar.gz" "artifacts/Lightsee-macOS-x64/Lightsee_x64.app.tar.gz"
+            mv "artifacts/Lightsee-macOS-x64/Lightsee.app.tar.gz.sig" "artifacts/Lightsee-macOS-x64/Lightsee_x64.app.tar.gz.sig"
+          fi
 
       - name: Generate latest.json
         run: |
@@ -154,23 +172,18 @@ jobs:
           REPO="wishket-aidp/lightsee"
           BASE_URL="https://github.com/$REPO/releases/download/$VERSION"
 
-          # Find updater artifact filenames
-          MAC_ARM64_TAR=$(find artifacts -name "*aarch64*.tar.gz" ! -name "*.sig" | head -1 | xargs basename 2>/dev/null || echo "")
-          MAC_ARM64_SIG=$(find artifacts -name "*aarch64*.tar.gz.sig" | head -1)
-          MAC_X64_TAR=$(find artifacts -name "*x86_64*apple*.tar.gz" ! -name "*.sig" | head -1 | xargs basename 2>/dev/null || echo "")
-          MAC_X64_SIG=$(find artifacts -name "*x86_64*apple*.tar.gz.sig" | head -1)
-          WIN_ZIP=$(find artifacts -name "*.nsis.zip" ! -name "*.sig" | head -1 | xargs basename 2>/dev/null || echo "")
-          WIN_SIG=$(find artifacts -name "*.nsis.zip.sig" | head -1)
-
           # Read signatures
-          MAC_ARM64_SIG_CONTENT=""
-          MAC_X64_SIG_CONTENT=""
-          WIN_SIG_CONTENT=""
-          [ -n "$MAC_ARM64_SIG" ] && MAC_ARM64_SIG_CONTENT=$(cat "$MAC_ARM64_SIG")
-          [ -n "$MAC_X64_SIG" ] && MAC_X64_SIG_CONTENT=$(cat "$MAC_X64_SIG")
-          [ -n "$WIN_SIG" ] && WIN_SIG_CONTENT=$(cat "$WIN_SIG")
+          MAC_ARM64_SIG=""
+          MAC_X64_SIG=""
+          WIN_SIG=""
+          [ -f "artifacts/Lightsee-macOS-arm64/Lightsee_aarch64.app.tar.gz.sig" ] && MAC_ARM64_SIG=$(cat "artifacts/Lightsee-macOS-arm64/Lightsee_aarch64.app.tar.gz.sig")
+          [ -f "artifacts/Lightsee-macOS-x64/Lightsee_x64.app.tar.gz.sig" ] && MAC_X64_SIG=$(cat "artifacts/Lightsee-macOS-x64/Lightsee_x64.app.tar.gz.sig")
+          WIN_SIG_FILE=$(find artifacts/Lightsee-Windows-x64 -name "*.nsis.zip.sig" 2>/dev/null | head -1)
+          [ -n "$WIN_SIG_FILE" ] && WIN_SIG=$(cat "$WIN_SIG_FILE")
 
-          # Build latest.json
+          # Get Windows nsis.zip filename
+          WIN_ZIP=$(find artifacts/Lightsee-Windows-x64 -name "*.nsis.zip" ! -name "*.sig" 2>/dev/null | head -1 | xargs basename 2>/dev/null || echo "")
+
           cat > artifacts/latest.json << ENDJSON
           {
             "version": "$VERSION_NUM",
@@ -178,15 +191,15 @@ jobs:
             "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": {
               "darwin-aarch64": {
-                "signature": "$MAC_ARM64_SIG_CONTENT",
-                "url": "$BASE_URL/$MAC_ARM64_TAR"
+                "signature": "$MAC_ARM64_SIG",
+                "url": "$BASE_URL/Lightsee_aarch64.app.tar.gz"
               },
               "darwin-x86_64": {
-                "signature": "$MAC_X64_SIG_CONTENT",
-                "url": "$BASE_URL/$MAC_X64_TAR"
+                "signature": "$MAC_X64_SIG",
+                "url": "$BASE_URL/Lightsee_x64.app.tar.gz"
               },
               "windows-x86_64": {
-                "signature": "$WIN_SIG_CONTENT",
+                "signature": "$WIN_SIG",
                 "url": "$BASE_URL/$WIN_ZIP"
               }
             }
