@@ -1,3 +1,5 @@
+mod share;
+
 use std::sync::{Arc, Mutex};
 
 fn normalize_path(path: &std::path::Path) -> String {
@@ -93,6 +95,36 @@ fn list_markdown_files(path: String) -> Result<Vec<FileEntry>, String> {
     Ok(scan_markdown_dir(dir))
 }
 
+#[tauri::command]
+async fn start_sharing(
+    content: share::ContentPayload,
+    state: tauri::State<'_, share::ShareManager>,
+) -> Result<share::ShareInfo, String> {
+    state.start(content, 3900).await
+}
+
+#[tauri::command]
+async fn stop_sharing(
+    state: tauri::State<'_, share::ShareManager>,
+) -> Result<(), String> {
+    state.stop().await
+}
+
+#[tauri::command]
+async fn update_shared_content(
+    content: share::ContentPayload,
+    state: tauri::State<'_, share::ShareManager>,
+) -> Result<(), String> {
+    state.update_content(content).await
+}
+
+#[tauri::command]
+async fn get_share_status(
+    state: tauri::State<'_, share::ShareManager>,
+) -> Result<share::ShareStatus, String> {
+    Ok(state.status().await)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pending = Arc::new(Mutex::new(Vec::new()));
@@ -115,7 +147,11 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(PendingFiles(pending))
-        .invoke_handler(tauri::generate_handler![get_pending_files, read_file, list_markdown_files])
+        .manage(share::ShareManager::new())
+        .invoke_handler(tauri::generate_handler![
+            get_pending_files, read_file, list_markdown_files,
+            start_sharing, stop_sharing, update_shared_content, get_share_status
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 

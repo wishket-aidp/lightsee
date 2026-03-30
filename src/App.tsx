@@ -11,6 +11,7 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
+import SharePanel from "./SharePanel";
 import "./App.css";
 
 const themes = {
@@ -69,6 +70,8 @@ function App() {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(240);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(220);
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const settingsLoaded = useRef(false);
 
@@ -378,6 +381,17 @@ function App() {
             <button className="btn btn-sm" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={() => setFontSize((s) => Math.min(s + 2, 32))}>A+</button>
           </div>
           <button
+            className={`btn ${isSharing ? "btn-sharing" : ""}`}
+            style={{
+              color: isSharing ? "#fff" : currentTheme.text,
+              backgroundColor: isSharing ? currentTheme.link : "transparent",
+              borderColor: isSharing ? currentTheme.link : currentTheme.border,
+            }}
+            onClick={() => setShowSharePanel(!showSharePanel)}
+          >
+            {isSharing ? "Sharing" : "Share"}
+          </button>
+          <button
             className="btn"
             style={{ color: currentTheme.text, borderColor: currentTheme.border }}
             onClick={() => setShowThemePanel(!showThemePanel)}
@@ -410,6 +424,16 @@ function App() {
             </div>
           ))}
         </div>
+      )}
+
+      {showSharePanel && (
+        <SharePanel
+          theme={currentTheme}
+          activeHtml={activeTab?.html || null}
+          fontSize={fontSize}
+          fileName={activeTab?.fileName || null}
+          onSharingChange={setIsSharing}
+        />
       )}
 
       {showThemePanel && (
