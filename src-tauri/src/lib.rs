@@ -28,6 +28,71 @@ fn read_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
 }
 
+#[derive(serde::Serialize, Clone)]
+struct FileEntry {
+    name: String,
+    path: String,
+    is_dir: bool,
+    children: Vec<FileEntry>,
+}
+
+fn scan_markdown_dir(dir: &std::path::Path) -> Vec<FileEntry> {
+    let mut entries = Vec::new();
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
+        return entries;
+    };
+
+    let mut items: Vec<_> = read_dir.filter_map(|e| e.ok()).collect();
+    items.sort_by(|a, b| {
+        let a_is_dir = a.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let b_is_dir = b.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        b_is_dir.cmp(&a_is_dir).then_with(|| {
+            a.file_name().to_string_lossy().to_lowercase().cmp(
+                &b.file_name().to_string_lossy().to_lowercase(),
+            )
+        })
+    });
+
+    for item in items {
+        let path = item.path();
+        let name = item.file_name().to_string_lossy().to_string();
+
+        // Skip hidden files/dirs
+        if name.starts_with('.') {
+            continue;
+        }
+
+        if path.is_dir() {
+            let children = scan_markdown_dir(&path);
+            if !children.is_empty() {
+                entries.push(FileEntry {
+                    name,
+                    path: normalize_path(&path),
+                    is_dir: true,
+                    children,
+                });
+            }
+        } else if is_markdown_ext(&path) {
+            entries.push(FileEntry {
+                name,
+                path: normalize_path(&path),
+                is_dir: false,
+                children: Vec::new(),
+            });
+        }
+    }
+    entries
+}
+
+#[tauri::command]
+fn list_markdown_files(path: String) -> Result<Vec<FileEntry>, String> {
+    let dir = std::path::Path::new(&path);
+    if !dir.is_dir() {
+        return Err(format!("{} is not a directory", path));
+    }
+    Ok(scan_markdown_dir(dir))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pending = Arc::new(Mutex::new(Vec::new()));
@@ -50,7 +115,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(PendingFiles(pending))
-        .invoke_handler(tauri::generate_handler![get_pending_files, read_file])
+        .invoke_handler(tauri::generate_handler![get_pending_files, read_file, list_markdown_files])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
