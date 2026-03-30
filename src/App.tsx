@@ -11,7 +11,7 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
-import SharePanel from "./SharePanel";
+import SharePanel, { ShareInfo } from "./SharePanel";
 import "./App.css";
 
 const themes = {
@@ -71,7 +71,7 @@ function App() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(220);
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
   const [showSharePanel, setShowSharePanel] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
+  const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const settingsLoaded = useRef(false);
 
@@ -381,15 +381,15 @@ function App() {
             <button className="btn btn-sm" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={() => setFontSize((s) => Math.min(s + 2, 32))}>A+</button>
           </div>
           <button
-            className={`btn ${isSharing ? "btn-sharing" : ""}`}
+            className={`btn ${shareInfo ? "btn-sharing" : ""}`}
             style={{
-              color: isSharing ? "#fff" : currentTheme.text,
-              backgroundColor: isSharing ? currentTheme.link : "transparent",
-              borderColor: isSharing ? currentTheme.link : currentTheme.border,
+              color: shareInfo ? "#fff" : currentTheme.text,
+              backgroundColor: shareInfo ? currentTheme.link : "transparent",
+              borderColor: shareInfo ? currentTheme.link : currentTheme.border,
             }}
             onClick={() => setShowSharePanel(!showSharePanel)}
           >
-            {isSharing ? "Sharing" : "Share"}
+            {shareInfo ? "Sharing" : "Share"}
           </button>
           <button
             className="btn"
@@ -432,7 +432,8 @@ function App() {
           activeHtml={activeTab?.html || null}
           fontSize={fontSize}
           fileName={activeTab?.fileName || null}
-          onSharingChange={setIsSharing}
+          shareInfo={shareInfo}
+          onShareInfoChange={setShareInfo}
         />
       )}
 

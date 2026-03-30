@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-interface ShareInfo {
+export interface ShareInfo {
   url: string;
   qrSvg: string;
   port: number;
@@ -30,14 +30,14 @@ interface SharePanelProps {
   activeHtml: string | null;
   fontSize: number;
   fileName: string | null;
-  onSharingChange: (sharing: boolean) => void;
+  shareInfo: ShareInfo | null;
+  onShareInfoChange: (info: ShareInfo | null) => void;
 }
 
-export default function SharePanel({ theme, activeHtml, fontSize, fileName, onSharingChange }: SharePanelProps) {
-  const [info, setInfo] = useState<ShareInfo | null>(null);
+export default function SharePanel({ theme, activeHtml, fontSize, fileName, shareInfo, onShareInfoChange }: SharePanelProps) {
   const [clients, setClients] = useState(0);
   const [copied, setCopied] = useState(false);
-  const sharing = info !== null;
+  const sharing = shareInfo !== null;
 
   // Poll client count while sharing
   useEffect(() => {
@@ -45,11 +45,15 @@ export default function SharePanel({ theme, activeHtml, fontSize, fileName, onSh
     const poll = setInterval(async () => {
       try {
         const status = await invoke<ShareStatus>("get_share_status");
+        if (!status.running) {
+          onShareInfoChange(null);
+          return;
+        }
         setClients(status.connectedClients);
       } catch { /* ignore */ }
     }, 2000);
     return () => clearInterval(poll);
-  }, [sharing]);
+  }, [sharing, onShareInfoChange]);
 
   // Sync content changes to shared server
   useEffect(() => {
@@ -83,25 +87,23 @@ export default function SharePanel({ theme, activeHtml, fontSize, fileName, onSh
           fileName,
         },
       });
-      setInfo(result);
-      onSharingChange(true);
+      onShareInfoChange(result);
     } catch { /* ignore */ }
-  }, [activeHtml, theme, fontSize, fileName, onSharingChange]);
+  }, [activeHtml, theme, fontSize, fileName, onShareInfoChange]);
 
   const stop = useCallback(async () => {
     await invoke("stop_sharing").catch(() => {});
-    setInfo(null);
+    onShareInfoChange(null);
     setClients(0);
-    onSharingChange(false);
-  }, [onSharingChange]);
+  }, [onShareInfoChange]);
 
   const copyUrl = useCallback(() => {
-    if (info) {
-      navigator.clipboard.writeText(info.url);
+    if (shareInfo) {
+      navigator.clipboard.writeText(shareInfo.url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
-  }, [info]);
+  }, [shareInfo]);
 
   if (!sharing) {
     return (
@@ -145,9 +147,9 @@ export default function SharePanel({ theme, activeHtml, fontSize, fileName, onSh
         </span>
       </div>
       <div className="share-details">
-        <div className="share-url" style={{ color: theme.link }}>{info.url}</div>
+        <div className="share-url" style={{ color: theme.link }}>{shareInfo.url}</div>
         {/* QR SVG is generated server-side by the qrcode crate, not user content */}
-        <div className="share-qr" dangerouslySetInnerHTML={{ __html: info.qrSvg }} />
+        <div className="share-qr" dangerouslySetInnerHTML={{ __html: shareInfo.qrSvg }} />
       </div>
     </div>
   );
