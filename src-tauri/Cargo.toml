@@ -1,6 +1,6 @@
 [package]
 name = "lightsee"
-version = "0.6.0"
+version = "0.6.1"
 description = "A lightweight Markdown viewer"
 authors = ["yonggill"]
 edition = "2021"
