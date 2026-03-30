@@ -9,6 +9,8 @@ import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import LeftSidebar from "./LeftSidebar";
+import RightSidebar from "./RightSidebar";
 import "./App.css";
 
 const themes = {
@@ -37,11 +39,18 @@ const themes = {
 
 type ThemeKey = keyof typeof themes;
 
+interface Heading {
+  id: string;
+  text: string;
+  level: number;
+}
+
 interface Tab {
   id: string;
   fileName: string;
   filePath?: string;
   html: string;
+  headings: Heading[];
 }
 
 let tabIdCounter = 0;
@@ -55,6 +64,12 @@ function App() {
   const [recentFiles, setRecentFiles] = useState<string[]>([]);
   const [updateAvailable, setUpdateAvailable] = useState<Awaited<ReturnType<typeof check>> | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(240);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(220);
+  const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const settingsLoaded = useRef(false);
 
   const currentTheme = themes[theme];
@@ -70,6 +85,17 @@ function App() {
       if (savedFontSize) setFontSize(savedFontSize);
       const savedRecent = await store.get<string[]>("recentFiles");
       if (savedRecent) setRecentFiles(savedRecent);
+
+      const savedLeftOpen = await store.get<boolean>("leftSidebarOpen");
+      if (savedLeftOpen !== null && savedLeftOpen !== undefined) setLeftSidebarOpen(savedLeftOpen);
+      const savedRightOpen = await store.get<boolean>("rightSidebarOpen");
+      if (savedRightOpen !== null && savedRightOpen !== undefined) setRightSidebarOpen(savedRightOpen);
+      const savedLeftWidth = await store.get<number>("leftSidebarWidth");
+      if (savedLeftWidth) setLeftSidebarWidth(savedLeftWidth);
+      const savedRightWidth = await store.get<number>("rightSidebarWidth");
+      if (savedRightWidth) setRightSidebarWidth(savedRightWidth);
+      const savedFavFolders = await store.get<string[]>("favoriteFolders");
+      if (savedFavFolders) setFavoriteFolders(savedFavFolders);
 
       // Restore window size
       const savedWindow = await store.get<{ width: number; height: number }>("windowSize");
@@ -126,9 +152,14 @@ function App() {
       await store.set("theme", theme);
       await store.set("fontSize", fontSize);
       await store.set("recentFiles", recentFiles);
+      await store.set("leftSidebarOpen", leftSidebarOpen);
+      await store.set("rightSidebarOpen", rightSidebarOpen);
+      await store.set("leftSidebarWidth", leftSidebarWidth);
+      await store.set("rightSidebarWidth", rightSidebarWidth);
+      await store.set("favoriteFolders", favoriteFolders);
       await store.save();
     })();
-  }, [theme, fontSize, recentFiles]);
+  }, [theme, fontSize, recentFiles, leftSidebarOpen, rightSidebarOpen, leftSidebarWidth, rightSidebarWidth, favoriteFolders]);
 
   const addRecentFile = useCallback((filePath: string) => {
     setRecentFiles((prev) => {
@@ -139,10 +170,27 @@ function App() {
 
   const loadContent = useCallback((fileName: string, markdown: string, filePath?: string) => {
     const raw = marked.parse(markdown, { async: false }) as string;
+    // Content is sanitized with DOMPurify to prevent XSS before any rendering
     const sanitized = DOMPurify.sanitize(raw);
-    const html = sanitized.replace(/<table([\s\S]*?<\/table>)/g, '<div class="table-wrapper"><table$1</div>');
+    const wrapped = sanitized.replace(/<table([\s\S]*?<\/table>)/g, '<div class="table-wrapper"><table$1</div>');
+
+    // Inject IDs into headings and extract heading list
+    const headings: Heading[] = [];
+    const slugCounts = new Map<string, number>();
+    const html = wrapped.replace(/<(h[1-6])([^>]*)>([\s\S]*?)<\/\1>/gi, (_match, tag, attrs, content) => {
+      const text = content.replace(/<[^>]*>/g, "").trim();
+      let slug = text.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+      if (!slug) slug = "heading";
+      const count = slugCounts.get(slug) || 0;
+      slugCounts.set(slug, count + 1);
+      const finalSlug = count > 0 ? `${slug}-${count}` : slug;
+      const level = parseInt(tag[1], 10);
+      headings.push({ id: finalSlug, text, level });
+      return `<${tag}${attrs} id="${finalSlug}">${content}</${tag}>`;
+    });
+
     const id = `tab-${++tabIdCounter}`;
-    setTabs((prev) => [...prev, { id, fileName, filePath, html }]);
+    setTabs((prev) => [...prev, { id, fileName, filePath, html, headings }]);
     setActiveTabId(id);
     if (filePath) addRecentFile(filePath);
   }, [addRecentFile]);
@@ -188,6 +236,43 @@ function App() {
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
   }, []);
+
+  const addFavoriteFolder = useCallback((folderPath: string) => {
+    setFavoriteFolders((prev) => prev.includes(folderPath) ? prev : [...prev, folderPath]);
+  }, []);
+
+  const removeFavoriteFolder = useCallback((folderPath: string) => {
+    setFavoriteFolders((prev) => prev.filter((f) => f !== folderPath));
+  }, []);
+
+  const removeRecentFile = useCallback((filePath: string) => {
+    setRecentFiles((prev) => prev.filter((f) => f !== filePath));
+  }, []);
+
+  const startResize = useCallback((side: "left" | "right", startX: number) => {
+    const startWidth = side === "left" ? leftSidebarWidth : rightSidebarWidth;
+    const setWidth = side === "left" ? setLeftSidebarWidth : setRightSidebarWidth;
+    const min = side === "left" ? 160 : 140;
+    const max = side === "left" ? 400 : 360;
+    const direction = side === "left" ? 1 : -1;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const delta = (e.clientX - startX) * direction;
+      setWidth(Math.min(max, Math.max(min, startWidth + delta)));
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [leftSidebarWidth, rightSidebarWidth]);
 
   // Poll for pending files from backend + listen for live events
   useEffect(() => {
@@ -258,6 +343,22 @@ function App() {
         <div className="toolbar-left">
           <button className="btn" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={openFile}>
             Open File
+          </button>
+          <button
+            className="btn-icon"
+            style={{ color: currentTheme.text, borderColor: currentTheme.border, opacity: leftSidebarOpen ? 1 : 0.4 }}
+            onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
+            title="Toggle left sidebar"
+          >
+            &#9776;
+          </button>
+          <button
+            className="btn-icon"
+            style={{ color: currentTheme.text, borderColor: currentTheme.border, opacity: rightSidebarOpen ? 1 : 0.4 }}
+            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+            title="Toggle right sidebar"
+          >
+            &#8801;
           </button>
         </div>
         <div className="toolbar-right">
@@ -330,47 +431,71 @@ function App() {
         </div>
       )}
 
-      <main className="content">
-        {activeTab ? (
-          <div
-            className="markdown-body"
-            style={{
-              fontSize: `${fontSize}px`,
-              "--heading-color": currentTheme.heading,
-              "--link-color": currentTheme.link,
-              "--code-bg": currentTheme.codeBg,
-              "--border-color": currentTheme.border,
-              "--blockquote-border": currentTheme.blockquoteBorder,
-              "--blockquote-text": currentTheme.blockquoteText,
-            } as React.CSSProperties}
-            dangerouslySetInnerHTML={{ __html: activeTab.html }}  // Content is sanitized with DOMPurify in loadContent
-          />
-        ) : (
-          <div className="empty-state">
-            <div className="empty-icon">📄</div>
-            <p>Drop a markdown file here</p>
-            <p className="empty-sub">or press <strong>{isMac ? "⌘T" : "Ctrl+T"}</strong> to open a file</p>
-            {recentFiles.length > 0 && (
-              <div className="recent-files" style={{ marginTop: "24px", textAlign: "left", maxWidth: "400px" }}>
-                <p style={{ fontSize: "12px", color: currentTheme.blockquoteText, marginBottom: "8px" }}>Recent Files</p>
-                {recentFiles.map((f) => (
-                  <button
-                    key={f}
-                    className="recent-file-item"
-                    style={{ color: currentTheme.link, borderColor: currentTheme.border }}
-                    onClick={() => openFilePath(f)}
-                  >
-                    {f.split(/[/\\]/).pop()}
-                    <span style={{ fontSize: "11px", color: currentTheme.blockquoteText, marginLeft: "8px" }}>
-                      {f.split(/[/\\]/).slice(0, -1).join("/")}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="main-body">
+        {leftSidebarOpen && (
+          <>
+            <div style={{ width: `${leftSidebarWidth}px` }}>
+              <LeftSidebar
+                recentFiles={recentFiles}
+                favoriteFolders={favoriteFolders}
+                theme={currentTheme}
+                onOpenFile={openFilePath}
+                onAddFolder={addFavoriteFolder}
+                onRemoveFolder={removeFavoriteFolder}
+                onRemoveRecent={removeRecentFile}
+              />
+            </div>
+            <div
+              className="resizer"
+              onMouseDown={(e) => startResize("left", e.clientX)}
+            />
+          </>
         )}
-      </main>
+
+        <main
+          className="content"
+          ref={contentRef}
+          style={{
+            "--heading-color": currentTheme.heading,
+            "--link-color": currentTheme.link,
+            "--code-bg": currentTheme.codeBg,
+            "--border-color": currentTheme.border,
+            "--blockquote-border": currentTheme.blockquoteBorder,
+            "--blockquote-text": currentTheme.blockquoteText,
+          } as React.CSSProperties}
+        >
+          {activeTab ? (
+            <div
+              className="markdown-body"
+              style={{ fontSize: `${fontSize}px` }}
+              // Content is sanitized with DOMPurify in loadContent
+              dangerouslySetInnerHTML={{ __html: activeTab.html }}
+            />
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">📄</div>
+              <p>Drop a markdown file here</p>
+              <p className="empty-sub">or press <strong>{isMac ? "⌘T" : "Ctrl+T"}</strong> to open a file</p>
+            </div>
+          )}
+        </main>
+
+        {rightSidebarOpen && (
+          <>
+            <div
+              className="resizer"
+              onMouseDown={(e) => startResize("right", e.clientX)}
+            />
+            <div style={{ width: `${rightSidebarWidth}px` }}>
+              <RightSidebar
+                headings={activeTab?.headings || []}
+                theme={currentTheme}
+                contentRef={contentRef}
+              />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
