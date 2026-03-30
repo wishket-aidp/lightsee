@@ -2027,7 +2027,7 @@ dependencies = [
 
 [[package]]
 name = "lightsee"
-version = "0.3.0"
+version = "0.4.9"
 dependencies = [
  "serde",
  "serde_json",
