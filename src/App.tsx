@@ -73,7 +73,8 @@ function App() {
   const [showCloudPanel, setShowCloudPanel] = useState(false);
   const [cloudShares, setCloudShares] = useState<Array<{ local_path: string; slug: string }>>([]);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const settingsLoaded = useRef(false);
+  const storeRef = useRef<Awaited<ReturnType<typeof load>> | null>(null);
 
   const currentTheme = themes[theme];
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
@@ -82,6 +83,8 @@ function App() {
   useEffect(() => {
     (async () => {
       const store = await load("settings.json");
+      storeRef.current = store;
+
       const savedTheme = await store.get<ThemeKey>("theme");
       if (savedTheme && savedTheme in themes) setTheme(savedTheme);
       const savedFontSize = await store.get<number>("fontSize");
@@ -108,7 +111,10 @@ function App() {
         const win = getCurrentWindow();
         await win.setSize(new LogicalSize(savedWindow.width, savedWindow.height));
       }
-      setSettingsLoaded(true);
+
+      // Mark loaded AFTER a microtask so React has flushed all the setState calls above
+      await new Promise((r) => setTimeout(r, 0));
+      settingsLoaded.current = true;
     })();
   }, []);
 
@@ -135,20 +141,20 @@ function App() {
     }
   }, [updateAvailable]);
 
-  // Save window size on resize (debounced, using logical size)
+  // Save window size on resize (debounced, uses shared store instance)
   useEffect(() => {
     const win = getCurrentWindow();
     let timer: ReturnType<typeof setTimeout>;
     const unlisten = win.onResized(async () => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
+        if (!storeRef.current) return;
         const size = await win.innerSize();
         const factor = await win.scaleFactor();
         const logicalWidth = Math.round(size.width / factor);
         const logicalHeight = Math.round(size.height / factor);
-        const store = await load("settings.json");
-        await store.set("windowSize", { width: logicalWidth, height: logicalHeight });
-        await store.save();
+        await storeRef.current.set("windowSize", { width: logicalWidth, height: logicalHeight });
+        await storeRef.current.save();
       }, 500);
     });
     return () => { clearTimeout(timer); unlisten.then((fn) => fn()); };
@@ -157,10 +163,11 @@ function App() {
   // Save settings to store on change (debounced, only after initial load)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    if (!settingsLoaded) return;
+    if (!settingsLoaded.current || !storeRef.current) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const store = await load("settings.json");
+      const store = storeRef.current;
+      if (!store) return;
       await store.set("theme", theme);
       await store.set("fontSize", fontSize);
       await store.set("recentFiles", recentFiles);
@@ -170,9 +177,9 @@ function App() {
       await store.set("rightSidebarWidth", rightSidebarWidth);
       await store.set("favoriteFolders", favoriteFolders);
       await store.save();
-    }, 300);
+    }, 500);
     return () => clearTimeout(saveTimer.current);
-  }, [settingsLoaded, theme, fontSize, recentFiles, leftSidebarOpen, rightSidebarOpen, leftSidebarWidth, rightSidebarWidth, favoriteFolders]);
+  }, [theme, fontSize, recentFiles, leftSidebarOpen, rightSidebarOpen, leftSidebarWidth, rightSidebarWidth, favoriteFolders]);
 
   const addRecentFile = useCallback((filePath: string) => {
     setRecentFiles((prev) => {
