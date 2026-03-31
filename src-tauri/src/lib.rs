@@ -1,6 +1,8 @@
 mod cloud;
 
 use std::sync::{Arc, Mutex};
+use tauri::menu::{MenuBuilder, SubmenuBuilder, MenuItemBuilder, PredefinedMenuItem};
+use tauri::Emitter;
 use tauri_plugin_cli::CliExt;
 
 pub(crate) fn normalize_path(path: &std::path::Path) -> String {
@@ -111,6 +113,63 @@ pub fn run() {
     let pending_for_event = pending.clone();
 
     let app = tauri::Builder::default()
+        .setup(|app| {
+            let check_update = MenuItemBuilder::with_id("check_update", "Check for Updates...")
+                .build(app)?;
+
+            let app_submenu = SubmenuBuilder::new(app, "Lightsee")
+                .item(&PredefinedMenuItem::about(app, Some("About Lightsee"), None)?)
+                .separator()
+                .item(&check_update)
+                .separator()
+                .item(&PredefinedMenuItem::hide(app, None)?)
+                .item(&PredefinedMenuItem::hide_others(app, None)?)
+                .item(&PredefinedMenuItem::show_all(app, None)?)
+                .separator()
+                .item(&PredefinedMenuItem::quit(app, None)?)
+                .build()?;
+
+            let edit_submenu = SubmenuBuilder::new(app, "Edit")
+                .item(&PredefinedMenuItem::undo(app, None)?)
+                .item(&PredefinedMenuItem::redo(app, None)?)
+                .separator()
+                .item(&PredefinedMenuItem::cut(app, None)?)
+                .item(&PredefinedMenuItem::copy(app, None)?)
+                .item(&PredefinedMenuItem::paste(app, None)?)
+                .item(&PredefinedMenuItem::select_all(app, None)?)
+                .build()?;
+
+            let view_submenu = SubmenuBuilder::new(app, "View")
+                .item(&PredefinedMenuItem::fullscreen(app, None)?)
+                .item(&PredefinedMenuItem::minimize(app, None)?)
+                .item(&PredefinedMenuItem::maximize(app, None)?)
+                .build()?;
+
+            let window_submenu = SubmenuBuilder::new(app, "Window")
+                .item(&PredefinedMenuItem::minimize(app, None)?)
+                .item(&PredefinedMenuItem::close_window(app, None)?)
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&app_submenu)
+                .item(&edit_submenu)
+                .item(&view_submenu)
+                .item(&window_submenu)
+                .build()?;
+
+            app.set_menu(menu)?;
+
+            app.on_menu_event(move |app_handle, event| {
+                if event.id() == check_update.id() {
+                    let handle = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = handle.emit("check-update", ());
+                    });
+                }
+            });
+
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

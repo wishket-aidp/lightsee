@@ -118,7 +118,7 @@ function App() {
     })();
   }, []);
 
-  // Check for updates on mount and every 10 minutes
+  // Check for updates on mount, every 10 minutes, and on menu trigger
   useEffect(() => {
     const checkForUpdate = () => {
       check().then((update) => {
@@ -127,7 +127,11 @@ function App() {
     };
     checkForUpdate();
     const interval = setInterval(checkForUpdate, 10 * 60 * 1000);
-    return () => clearInterval(interval);
+    const unlisten = listen("check-update", () => checkForUpdate());
+    return () => {
+      clearInterval(interval);
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   const doUpdate = useCallback(async () => {
