@@ -151,8 +151,11 @@ export default function LeftSidebar({
 
   const handleCloudExpose = useCallback(async (folder: string) => {
     setExposingFolder(folder);
-    onCloudExpose(folder);
-    setExposingFolder(null);
+    try {
+      await onCloudExpose(folder);
+    } finally {
+      setExposingFolder(null);
+    }
   }, [onCloudExpose]);
 
   const handleAddFolder = useCallback(async () => {

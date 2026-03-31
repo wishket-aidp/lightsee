@@ -152,10 +152,12 @@ function App() {
     return () => { clearTimeout(timer); unlisten.then((fn) => fn()); };
   }, []);
 
-  // Save settings to store on change (only after initial load)
+  // Save settings to store on change (debounced, only after initial load)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     if (!settingsLoaded) return;
-    (async () => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
       const store = await load("settings.json");
       await store.set("theme", theme);
       await store.set("fontSize", fontSize);
@@ -166,8 +168,9 @@ function App() {
       await store.set("rightSidebarWidth", rightSidebarWidth);
       await store.set("favoriteFolders", favoriteFolders);
       await store.save();
-    })();
-  }, [theme, fontSize, recentFiles, leftSidebarOpen, rightSidebarOpen, leftSidebarWidth, rightSidebarWidth, favoriteFolders]);
+    }, 300);
+    return () => clearTimeout(saveTimer.current);
+  }, [settingsLoaded, theme, fontSize, recentFiles, leftSidebarOpen, rightSidebarOpen, leftSidebarWidth, rightSidebarWidth, favoriteFolders]);
 
   const addRecentFile = useCallback((filePath: string) => {
     setRecentFiles((prev) => {
