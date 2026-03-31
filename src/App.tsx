@@ -112,11 +112,16 @@ function App() {
     })();
   }, []);
 
-  // Check for updates on mount
+  // Check for updates on mount and every 10 minutes
   useEffect(() => {
-    check().then((update) => {
-      if (update) setUpdateAvailable(update);
-    }).catch(() => {});
+    const checkForUpdate = () => {
+      check().then((update) => {
+        if (update) setUpdateAvailable(update);
+      }).catch(() => {});
+    };
+    checkForUpdate();
+    const interval = setInterval(checkForUpdate, 10 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const doUpdate = useCallback(async () => {
