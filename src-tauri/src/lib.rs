@@ -2,6 +2,7 @@ mod cloud;
 mod share;
 
 use std::sync::{Arc, Mutex};
+use tauri_plugin_cli::CliExt;
 
 pub(crate) fn normalize_path(path: &std::path::Path) -> String {
     let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
@@ -147,6 +148,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_cli::init())
         .manage(PendingFiles(pending))
         .manage(share::ShareManager::new())
         .invoke_handler(tauri::generate_handler![
@@ -156,6 +158,83 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
+
+    // Handle CLI subcommands
+    if let Ok(matches) = app.cli().matches() {
+        if let Some(ref subcmd) = matches.subcommand {
+            let app_handle = app.handle().clone();
+            match subcmd.name.as_str() {
+                "expose" => {
+                    let path = subcmd.matches.args.get("path")
+                        .and_then(|a| a.value.as_str())
+                        .map(|s: &str| s.to_string())
+                        .expect("path argument required");
+
+                    let path = std::path::Path::new(&path)
+                        .canonicalize()
+                        .unwrap_or_else(|_| std::path::PathBuf::from(&path))
+                        .to_string_lossy()
+                        .to_string();
+
+                    tauri::async_runtime::spawn(async move {
+                        match cloud::cloud_expose(app_handle, path, "light".to_string()).await {
+                            Ok(result) => {
+                                println!("Uploaded {} file(s). Share URL: {}", result.files_uploaded, result.url);
+                                std::process::exit(0);
+                            }
+                            Err(e) => {
+                                eprintln!("Error: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    });
+                    return;
+                }
+                "list" => {
+                    tauri::async_runtime::spawn(async move {
+                        match cloud::cloud_list(app_handle).await {
+                            Ok(items) => {
+                                if items.is_empty() {
+                                    println!("No cloud shares.");
+                                } else {
+                                    for item in items {
+                                        println!("{}\t{}\t{}\t{}", item.slug, item.share_type, item.local_path.unwrap_or_default(), item.updated_at);
+                                    }
+                                }
+                                std::process::exit(0);
+                            }
+                            Err(e) => {
+                                eprintln!("Error: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    });
+                    return;
+                }
+                "remove" => {
+                    let slug = subcmd.matches.args.get("slug")
+                        .and_then(|a| a.value.as_str())
+                        .map(|s: &str| s.to_string())
+                        .expect("slug argument required");
+
+                    tauri::async_runtime::spawn(async move {
+                        match cloud::cloud_remove(app_handle, slug).await {
+                            Ok(()) => {
+                                println!("Share removed.");
+                                std::process::exit(0);
+                            }
+                            Err(e) => {
+                                eprintln!("Error: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    });
+                    return;
+                }
+                _ => {}
+            }
+        }
+    }
 
     app.run(move |_app_handle, event| {
         if let tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }), .. } = &event {

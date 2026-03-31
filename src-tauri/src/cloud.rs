@@ -30,20 +30,20 @@ struct CloudShareRecord {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CloudShareResult {
-    url: String,
-    slug: String,
-    share_id: String,
-    files_uploaded: usize,
+    pub url: String,
+    pub slug: String,
+    pub share_id: String,
+    pub files_uploaded: usize,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CloudShareListItem {
-    slug: String,
-    title: String,
-    share_type: String,
-    local_path: Option<String>,
-    url: String,
-    updated_at: String,
+    pub slug: String,
+    pub title: String,
+    pub share_type: String,
+    pub local_path: Option<String>,
+    pub url: String,
+    pub updated_at: String,
 }
 
 // Supabase REST response types

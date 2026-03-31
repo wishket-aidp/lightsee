@@ -47,6 +47,38 @@
     }
   },
   "plugins": {
+    "cli": {
+      "description": "Lightsee - Markdown viewer and cloud sharing tool",
+      "args": [],
+      "subcommands": {
+        "expose": {
+          "description": "Expose a file or folder to the cloud",
+          "args": [
+            {
+              "name": "path",
+              "description": "Path to markdown file or folder",
+              "index": 1,
+              "required": true
+            }
+          ]
+        },
+        "list": {
+          "description": "List cloud shares",
+          "args": []
+        },
+        "remove": {
+          "description": "Remove a cloud share",
+          "args": [
+            {
+              "name": "slug",
+              "description": "Share slug to remove",
+              "index": 1,
+              "required": true
+            }
+          ]
+        }
+      }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENCM0Y1RENGMzc3QkVCMQpSV1N4dm5mejNQV3pETm4reU5nWFZsREJ1OGJzWThIdHJsdFA2MTVsaTJNMlpEak1xQm9Rakk5Kwo=",
       "endpoints": [
