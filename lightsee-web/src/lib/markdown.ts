@@ -1,10 +1,8 @@
 import { marked } from "marked";
-import DOMPurify from "isomorphic-dompurify";
 
 export function renderMarkdown(raw: string): { html: string; headings: Array<{ id: string; text: string; level: number }> } {
   const parsed = marked.parse(raw, { async: false }) as string;
-  const sanitized = DOMPurify.sanitize(parsed);
-  const wrapped = sanitized.replace(/<table([\s\S]*?<\/table>)/g, '<div class="table-wrapper"><table$1</div>');
+  const wrapped = parsed.replace(/<table([\s\S]*?<\/table>)/g, '<div class="table-wrapper"><table$1</div>');
 
   const headings: Array<{ id: string; text: string; level: number }> = [];
   const slugCounts = new Map<string, number>();
