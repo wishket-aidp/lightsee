@@ -23,6 +23,7 @@ interface LeftSidebarProps {
   onAddFolder: (folderPath: string) => void;
   onRemoveFolder: (folderPath: string) => void;
   onRemoveRecent: (filePath: string) => void;
+  cloudPaths: string[];
 }
 
 function FileTree({
@@ -92,6 +93,7 @@ export default function LeftSidebar({
   onAddFolder,
   onRemoveFolder,
   onRemoveRecent,
+  cloudPaths,
 }: LeftSidebarProps) {
   const [folderTrees, setFolderTrees] = useState<Map<string, FileEntry[]>>(new Map());
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set(favoriteFolders));
@@ -184,6 +186,9 @@ export default function LeftSidebar({
                 <span>
                   <span className="tree-toggle">{isOpen ? "\u25BC" : "\u25B6"}</span>
                   {folderName(folder)}
+                  {cloudPaths.includes(folder) && (
+                    <span style={{ marginLeft: "4px", opacity: 0.6 }} title="Cloud shared">&#x2601;</span>
+                  )}
                 </span>
                 <button
                   className="folder-remove"

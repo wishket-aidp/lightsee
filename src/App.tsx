@@ -12,6 +12,7 @@ import DOMPurify from "dompurify";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
 import SharePanel, { ShareInfo } from "./SharePanel";
+import CloudSharePanel from "./CloudSharePanel";
 import "./App.css";
 
 const themes = {
@@ -71,7 +72,9 @@ function App() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(220);
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
   const [showSharePanel, setShowSharePanel] = useState(false);
+  const [showCloudPanel, setShowCloudPanel] = useState(false);
   const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
+  const [cloudShares, setCloudShares] = useState<Array<{ local_path: string; slug: string }>>([]);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const settingsLoaded = useRef(false);
 
@@ -99,6 +102,8 @@ function App() {
       if (savedRightWidth) setRightSidebarWidth(savedRightWidth);
       const savedFavFolders = await store.get<string[]>("favoriteFolders");
       if (savedFavFolders) setFavoriteFolders(savedFavFolders);
+      const savedCloudShares = await store.get<Array<{ local_path: string; slug: string }>>("cloud_shares");
+      if (savedCloudShares) setCloudShares(savedCloudShares);
 
       // Restore window size
       const savedWindow = await store.get<{ width: number; height: number }>("windowSize");
@@ -394,6 +399,13 @@ function App() {
           <button
             className="btn"
             style={{ color: currentTheme.text, borderColor: currentTheme.border }}
+            onClick={() => setShowCloudPanel(!showCloudPanel)}
+          >
+            Cloud
+          </button>
+          <button
+            className="btn"
+            style={{ color: currentTheme.text, borderColor: currentTheme.border }}
             onClick={() => setShowThemePanel(!showThemePanel)}
           >
             Theme
@@ -437,6 +449,14 @@ function App() {
         />
       )}
 
+      {showCloudPanel && (
+        <CloudSharePanel
+          theme={currentTheme}
+          activeFilePath={activeTab?.filePath || null}
+          themeName={theme}
+        />
+      )}
+
       {showThemePanel && (
         <div className="theme-panel" style={{ backgroundColor: currentTheme.codeBg, borderBottom: `1px solid ${currentTheme.border}` }}>
           {Object.entries(themes).map(([key, t]) => (
@@ -468,6 +488,7 @@ function App() {
                 onAddFolder={addFavoriteFolder}
                 onRemoveFolder={removeFavoriteFolder}
                 onRemoveRecent={removeRecentFile}
+                cloudPaths={cloudShares.map(s => s.local_path)}
               />
             </div>
             <div
