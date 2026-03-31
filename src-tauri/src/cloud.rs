@@ -609,3 +609,109 @@ fn cloud_remove_inner(app: &tauri::AppHandle, slug: &str) -> Result<(), String> 
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn create_temp_dir(prefix: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("lightsee_cloud_test_{}_{}", prefix, std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    // ── hash_api_key ───────────────────────────────────────────────
+
+    #[test]
+    fn hash_api_key_consistent_sha256() {
+        let hash = hash_api_key("test_key_123");
+        // SHA-256 of "test_key_123" is a known value
+        assert_eq!(hash.len(), 64); // 256 bits = 64 hex chars
+        // Verify consistency
+        assert_eq!(hash, hash_api_key("test_key_123"));
+        // Verify known hash (SHA-256 of "test_key_123")
+        assert_eq!(
+            hash,
+            "1f8e8c97805e4ad56c611029fbba4c04dab40bf05d18c46655696357705cc136"
+        );
+    }
+
+    // ── generate_slug ──────────────────────────────────────────────
+
+    #[test]
+    fn generate_slug_length() {
+        let slug = generate_slug();
+        assert_eq!(slug.len(), 10);
+    }
+
+    #[test]
+    fn generate_slug_unique() {
+        let a = generate_slug();
+        let b = generate_slug();
+        assert_ne!(a, b);
+    }
+
+    // ── collect_markdown_files ──────────────────────────────────────
+
+    #[test]
+    fn collect_markdown_files_only_md() {
+        let dir = create_temp_dir("collect_md");
+        fs::write(dir.join("a.md"), "md").unwrap();
+        fs::write(dir.join("b.markdown"), "markdown").unwrap();
+        fs::write(dir.join("c.txt"), "txt").unwrap();
+        fs::write(dir.join("d.rs"), "rs").unwrap();
+
+        let files = collect_markdown_files(&dir);
+        assert_eq!(files.len(), 2);
+        let names: Vec<String> = files.iter().map(|p| p.file_name().unwrap().to_string_lossy().to_string()).collect();
+        assert!(names.contains(&"a.md".to_string()));
+        assert!(names.contains(&"b.markdown".to_string()));
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn collect_markdown_files_skips_hidden() {
+        let dir = create_temp_dir("collect_hidden");
+        fs::write(dir.join("visible.md"), "ok").unwrap();
+        fs::write(dir.join(".hidden.md"), "hidden").unwrap();
+        let hidden_dir = dir.join(".hidden_dir");
+        fs::create_dir_all(&hidden_dir).unwrap();
+        fs::write(hidden_dir.join("inside.md"), "inside").unwrap();
+
+        let files = collect_markdown_files(&dir);
+        assert_eq!(files.len(), 1);
+        assert!(files[0].file_name().unwrap().to_string_lossy() == "visible.md");
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn collect_markdown_files_max_files_limit() {
+        let dir = create_temp_dir("collect_limit");
+        for i in 0..=MAX_FILES {
+            fs::write(dir.join(format!("file_{:04}.md", i)), "content").unwrap();
+        }
+
+        let files = collect_markdown_files(&dir);
+        assert!(files.len() <= MAX_FILES, "got {} files, max is {}", files.len(), MAX_FILES);
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn collect_markdown_files_single_file_returns_empty() {
+        // collect_markdown_files takes a dir; passing a single file returns empty
+        // (single-file handling is done at the call site in cloud_expose_inner)
+        let dir = create_temp_dir("collect_single");
+        let file = dir.join("single.md");
+        fs::write(&file, "content").unwrap();
+
+        let files = collect_markdown_files(&file);
+        assert!(files.is_empty());
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+}

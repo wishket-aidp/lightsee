@@ -222,3 +222,116 @@ pub fn run() {
         let _ = event;
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn create_temp_dir(prefix: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("lightsee_test_{}_{}", prefix, std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    // ── is_markdown_ext ────────────────────────────────────────────
+
+    #[test]
+    fn is_markdown_ext_supported_extensions() {
+        for ext in &["md", "markdown", "mdown", "mkd", "mdwn"] {
+            let path = PathBuf::from(format!("file.{}", ext));
+            assert!(is_markdown_ext(&path), "expected true for .{}", ext);
+        }
+    }
+
+    #[test]
+    fn is_markdown_ext_non_markdown() {
+        for name in &["file.txt", "file.html", "file.rs", "noext"] {
+            let path = PathBuf::from(name);
+            assert!(!is_markdown_ext(&path), "expected false for {}", name);
+        }
+    }
+
+    // ── scan_markdown_dir ──────────────────────────────────────────
+
+    #[test]
+    fn scan_markdown_dir_basic_structure() {
+        let dir = create_temp_dir("scan_basic");
+        fs::write(dir.join("alpha.md"), "# Alpha").unwrap();
+        fs::write(dir.join("beta.markdown"), "# Beta").unwrap();
+        let sub = dir.join("subdir");
+        fs::create_dir_all(&sub).unwrap();
+        fs::write(sub.join("gamma.md"), "# Gamma").unwrap();
+
+        let entries = scan_markdown_dir(&dir);
+
+        // Directories come first, then files sorted alphabetically
+        assert_eq!(entries.len(), 3);
+
+        let subdir_entry = entries.iter().find(|e| e.name == "subdir").unwrap();
+        assert!(subdir_entry.is_dir);
+        assert_eq!(subdir_entry.children.len(), 1);
+        assert_eq!(subdir_entry.children[0].name, "gamma.md");
+
+        let alpha = entries.iter().find(|e| e.name == "alpha.md").unwrap();
+        assert!(!alpha.is_dir);
+        assert!(alpha.children.is_empty());
+
+        let beta = entries.iter().find(|e| e.name == "beta.markdown").unwrap();
+        assert!(!beta.is_dir);
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn scan_markdown_dir_excludes_hidden_files() {
+        let dir = create_temp_dir("scan_hidden");
+        fs::write(dir.join("visible.md"), "ok").unwrap();
+        fs::write(dir.join(".hidden.md"), "hidden").unwrap();
+        let hidden_dir = dir.join(".hidden_dir");
+        fs::create_dir_all(&hidden_dir).unwrap();
+        fs::write(hidden_dir.join("inside.md"), "inside").unwrap();
+
+        let entries = scan_markdown_dir(&dir);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "visible.md");
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn scan_markdown_dir_excludes_empty_directories() {
+        let dir = create_temp_dir("scan_empty");
+        fs::write(dir.join("file.md"), "ok").unwrap();
+        let empty = dir.join("empty_dir");
+        fs::create_dir_all(&empty).unwrap();
+
+        let entries = scan_markdown_dir(&dir);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "file.md");
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // ── read_file ──────────────────────────────────────────────────
+
+    #[test]
+    fn read_file_existing() {
+        let dir = create_temp_dir("read_ok");
+        let path = dir.join("test.md");
+        fs::write(&path, "hello world").unwrap();
+
+        let result = read_file(path.to_string_lossy().to_string());
+        assert_eq!(result.unwrap(), "hello world");
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn read_file_nonexistent() {
+        let result = read_file("/tmp/lightsee_nonexistent_12345.md".to_string());
+        assert!(result.is_err());
+    }
+}
