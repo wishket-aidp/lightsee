@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { renderMarkdown } from "@/lib/markdown";
 import { themes } from "@/lib/themes";
 import type { Share, ShareFile, ThemeColors } from "@/lib/types";
@@ -16,7 +16,7 @@ export default async function ShareFilePage({
   const { slug, path } = await params;
   const filePath = path.join("/");
 
-  const { data: share } = await supabase
+  const { data: share } = await getSupabase()
     .from("shares")
     .select("*")
     .eq("slug", slug)
@@ -27,7 +27,7 @@ export default async function ShareFilePage({
   const typedShare = share as Share;
   const theme: ThemeColors = themes[typedShare.theme] || themes.light;
 
-  const { data: files } = await supabase
+  const { data: files } = await getSupabase()
     .from("share_files")
     .select("*")
     .eq("share_id", typedShare.id)
@@ -38,7 +38,7 @@ export default async function ShareFilePage({
   const targetFile = typedFiles.find((f) => f.path === filePath);
   if (!targetFile) notFound();
 
-  const { data: fileData } = await supabase.storage
+  const { data: fileData } = await getSupabase().storage
     .from("lightsee-files")
     .download(targetFile.storage_path);
 

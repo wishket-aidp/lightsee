@@ -176,7 +176,7 @@ pub fn run() {
                         .to_string_lossy()
                         .to_string();
 
-                    tauri::async_runtime::spawn(async move {
+                    tauri::async_runtime::block_on(async move {
                         match cloud::cloud_expose(app_handle, path, "light".to_string()).await {
                             Ok(result) => {
                                 println!("Uploaded {} file(s). Share URL: {}", result.files_uploaded, result.url);
@@ -188,10 +188,9 @@ pub fn run() {
                             }
                         }
                     });
-                    return;
                 }
                 "list" => {
-                    tauri::async_runtime::spawn(async move {
+                    tauri::async_runtime::block_on(async move {
                         match cloud::cloud_list(app_handle).await {
                             Ok(items) => {
                                 if items.is_empty() {
@@ -209,7 +208,6 @@ pub fn run() {
                             }
                         }
                     });
-                    return;
                 }
                 "remove" => {
                     let slug = subcmd.matches.args.get("slug")
@@ -217,7 +215,7 @@ pub fn run() {
                         .map(|s: &str| s.to_string())
                         .expect("slug argument required");
 
-                    tauri::async_runtime::spawn(async move {
+                    tauri::async_runtime::block_on(async move {
                         match cloud::cloud_remove(app_handle, slug).await {
                             Ok(()) => {
                                 println!("Share removed.");
@@ -229,7 +227,6 @@ pub fn run() {
                             }
                         }
                     });
-                    return;
                 }
                 _ => {}
             }

@@ -52,6 +52,7 @@ struct SupabaseShare {
     id: String,
     slug: String,
     title: Option<String>,
+    #[serde(rename = "type")]
     share_type: String,
     updated_at: Option<String>,
 }
@@ -289,7 +290,7 @@ fn cloud_expose_inner(
         let body = serde_json::json!({
             "title": title,
             "theme": theme,
-            "share_type": share_type,
+            "type": share_type,
         });
 
         let resp = client
@@ -323,7 +324,7 @@ fn cloud_expose_inner(
             "api_key_id": creds.api_key_id,
             "title": title,
             "theme": theme,
-            "share_type": share_type,
+            "type": share_type,
         });
 
         let resp = client
@@ -406,8 +407,9 @@ fn cloud_expose_inner(
         // Insert share_files record
         let file_record = serde_json::json!({
             "share_id": share_id,
-            "file_path": rel_path,
+            "path": rel_path,
             "storage_path": storage_path,
+            "size_bytes": std::fs::metadata(file_path).map(|m| m.len()).unwrap_or(0),
         });
 
         let resp = client
