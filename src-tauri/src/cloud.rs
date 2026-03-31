@@ -1,16 +1,7 @@
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC, AsciiSet};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tauri_plugin_store::StoreExt;
-
-/// Characters allowed in storage path segments (unreserved + some safe chars).
-/// Encode everything except alphanumeric, `-`, `_`, `.`, `~`.
-const PATH_SEGMENT_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
-    .remove(b'-')
-    .remove(b'_')
-    .remove(b'.')
-    .remove(b'~');
 
 const SUPABASE_URL: &str = "https://orrbxkptrkkibggjxhmh.supabase.co";
 const SUPABASE_ANON_KEY: &str = "sb_publishable_XA3MvZtQyzmejLdLavGHeQ_aisNX2Ou";
@@ -73,6 +64,30 @@ struct EdgeFunctionResponse {
 }
 
 // ── Helper functions ────────────────────────────────────────────────
+
+/// Convert a path segment to an ASCII-safe storage key.
+/// Non-ASCII segments (e.g. Korean filenames) are replaced with a short hash,
+/// preserving the file extension for content-type detection.
+fn ascii_safe_segment(seg: &str) -> String {
+    if seg.is_ascii() {
+        return seg.to_string();
+    }
+    let hash = Sha256::digest(seg.as_bytes());
+    let short_hash = format!("{:x}", hash);
+    let short_hash = &short_hash[..16];
+    // Preserve extension if present
+    match seg.rfind('.') {
+        Some(dot) => {
+            let ext = &seg[dot..];
+            if ext.is_ascii() {
+                format!("{}{}", short_hash, ext)
+            } else {
+                short_hash.to_string()
+            }
+        }
+        None => short_hash.to_string(),
+    }
+}
 
 fn hash_api_key(key: &str) -> String {
     let mut hasher = Sha256::new();
@@ -391,14 +406,14 @@ fn cloud_expose_inner(
             .to_string_lossy()
             .replace('\\', "/");
 
-        // Percent-encode each path segment to handle non-ASCII characters (e.g. Korean)
-        let encoded_rel_path = rel_path
+        // Convert non-ASCII path segments to ASCII-safe hashed names for storage
+        let safe_rel_path = rel_path
             .split('/')
-            .map(|seg| utf8_percent_encode(seg, PATH_SEGMENT_ENCODE_SET).to_string())
+            .map(|seg| ascii_safe_segment(seg))
             .collect::<Vec<_>>()
             .join("/");
 
-        let storage_path = format!("{}/{}", share_id, encoded_rel_path);
+        let storage_path = format!("{}/{}", share_id, safe_rel_path);
 
         // Upload to Supabase Storage
         let resp = client

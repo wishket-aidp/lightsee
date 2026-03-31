@@ -1,6 +1,6 @@
 [package]
 name = "lightsee"
-version = "0.8.6"
+version = "0.8.7"
 description = "A lightweight Markdown viewer"
 authors = ["yonggill"]
 edition = "2021"
@@ -32,5 +32,4 @@ tokio = { version = "1", features = ["rt", "net", "sync"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "blocking"], default-features = false }
 sha2 = "0.10"
 nanoid = "0.4"
-percent-encoding = "2"
 
