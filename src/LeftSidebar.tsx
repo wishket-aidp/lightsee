@@ -23,8 +23,6 @@ interface LeftSidebarProps {
   onAddFolder: (folderPath: string) => void;
   onRemoveFolder: (folderPath: string) => void;
   onRemoveRecent: (filePath: string) => void;
-  cloudPaths: string[];
-  onCloudExpose: (folderPath: string) => void;
 }
 
 function FileTree({
@@ -94,12 +92,9 @@ export default function LeftSidebar({
   onAddFolder,
   onRemoveFolder,
   onRemoveRecent,
-  cloudPaths,
-  onCloudExpose,
 }: LeftSidebarProps) {
   const [folderTrees, setFolderTrees] = useState<Map<string, FileEntry[]>>(new Map());
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set(favoriteFolders));
-  const [exposingFolder, setExposingFolder] = useState<string | null>(null);
 
   // Load folder trees when favoriteFolders changes
   useEffect(() => {
@@ -148,15 +143,6 @@ export default function LeftSidebar({
       });
     } catch { /* ignore */ }
   }, []);
-
-  const handleCloudExpose = useCallback(async (folder: string) => {
-    setExposingFolder(folder);
-    try {
-      await onCloudExpose(folder);
-    } finally {
-      setExposingFolder(null);
-    }
-  }, [onCloudExpose]);
 
   const handleAddFolder = useCallback(async () => {
     const selected = await openDialog({
@@ -209,9 +195,6 @@ export default function LeftSidebar({
                 <span>
                   <span className="tree-toggle">{isOpen ? "\u25BC" : "\u25B6"}</span>
                   {folderName(folder)}
-                  {cloudPaths.includes(folder) && (
-                    <span style={{ marginLeft: "4px", opacity: 0.6 }} title="Cloud shared">&#x2601;</span>
-                  )}
                 </span>
                 <span className="folder-actions">
                   <button
@@ -223,17 +206,6 @@ export default function LeftSidebar({
                     }}
                   >
                     &#x21BB;
-                  </button>
-                  <button
-                    className="folder-action-btn"
-                    title={cloudPaths.includes(folder) ? "Update cloud share" : "Share to cloud"}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCloudExpose(folder);
-                    }}
-                    disabled={exposingFolder === folder}
-                  >
-                    {exposingFolder === folder ? "..." : "\u2601"}
                   </button>
                   <button
                     className="folder-remove"

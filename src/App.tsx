@@ -11,7 +11,6 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import LeftSidebar from "./LeftSidebar";
 import RightSidebar from "./RightSidebar";
-import SharePanel, { ShareInfo } from "./SharePanel";
 import CloudSharePanel from "./CloudSharePanel";
 import "./App.css";
 
@@ -71,10 +70,7 @@ function App() {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(240);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(220);
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
-  const [showSharePanel, setShowSharePanel] = useState(false);
   const [showCloudPanel, setShowCloudPanel] = useState(false);
-  const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
-  const [cloudShares, setCloudShares] = useState<Array<{ local_path: string; slug: string }>>([]);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -102,8 +98,6 @@ function App() {
       if (savedRightWidth) setRightSidebarWidth(savedRightWidth);
       const savedFavFolders = await store.get<string[]>("favoriteFolders");
       if (savedFavFolders) setFavoriteFolders(savedFavFolders);
-      const savedCloudShares = await store.get<Array<{ local_path: string; slug: string }>>("cloud_shares");
-      if (savedCloudShares) setCloudShares(savedCloudShares);
 
       // Restore window size
       const savedWindow = await store.get<{ width: number; height: number }>("windowSize");
@@ -260,23 +254,6 @@ function App() {
     setRecentFiles((prev) => prev.filter((f) => f !== filePath));
   }, []);
 
-  const handleCloudExpose = useCallback(async (folderPath: string) => {
-    try {
-      const result = await invoke<{ url: string; slug: string; share_id: string; files_uploaded: number }>("cloud_expose", {
-        path: folderPath,
-        theme,
-      });
-      setCloudShares((prev) => {
-        const filtered = prev.filter((s) => s.local_path !== folderPath);
-        return [...filtered, { local_path: folderPath, slug: result.slug }];
-      });
-      navigator.clipboard.writeText(result.url).catch(() => {});
-      alert(`Uploaded ${result.files_uploaded} file(s).\nURL copied: ${result.url}`);
-    } catch (e) {
-      alert(`Cloud share failed: ${e}`);
-    }
-  }, [theme]);
-
   const startResize = useCallback((side: "left" | "right", startX: number) => {
     const startWidth = side === "left" ? leftSidebarWidth : rightSidebarWidth;
     const setWidth = side === "left" ? setLeftSidebarWidth : setRightSidebarWidth;
@@ -406,17 +383,6 @@ function App() {
             <button className="btn btn-sm" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={() => setFontSize((s) => Math.min(s + 2, 32))}>A+</button>
           </div>
           <button
-            className={`btn ${shareInfo ? "btn-sharing" : ""}`}
-            style={{
-              color: shareInfo ? "#fff" : currentTheme.text,
-              backgroundColor: shareInfo ? currentTheme.link : "transparent",
-              borderColor: shareInfo ? currentTheme.link : currentTheme.border,
-            }}
-            onClick={() => setShowSharePanel(!showSharePanel)}
-          >
-            {shareInfo ? "Sharing" : "Share"}
-          </button>
-          <button
             className="btn"
             style={{ color: currentTheme.text, borderColor: currentTheme.border }}
             onClick={() => setShowCloudPanel(!showCloudPanel)}
@@ -458,17 +424,6 @@ function App() {
         </div>
       )}
 
-      {showSharePanel && (
-        <SharePanel
-          theme={currentTheme}
-          activeHtml={activeTab?.html || null}
-          fontSize={fontSize}
-          fileName={activeTab?.fileName || null}
-          shareInfo={shareInfo}
-          onShareInfoChange={setShareInfo}
-        />
-      )}
-
       {showCloudPanel && (
         <CloudSharePanel
           theme={currentTheme}
@@ -508,8 +463,6 @@ function App() {
                 onAddFolder={addFavoriteFolder}
                 onRemoveFolder={removeFavoriteFolder}
                 onRemoveRecent={removeRecentFile}
-                cloudPaths={cloudShares.map(s => s.local_path)}
-                onCloudExpose={handleCloudExpose}
               />
             </div>
             <div
