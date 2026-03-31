@@ -71,6 +71,7 @@ function App() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(220);
   const [favoriteFolders, setFavoriteFolders] = useState<string[]>([]);
   const [showCloudPanel, setShowCloudPanel] = useState(false);
+  const [cloudShares, setCloudShares] = useState<Array<{ local_path: string; slug: string }>>([]);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -98,6 +99,8 @@ function App() {
       if (savedRightWidth) setRightSidebarWidth(savedRightWidth);
       const savedFavFolders = await store.get<string[]>("favoriteFolders");
       if (savedFavFolders) setFavoriteFolders(savedFavFolders);
+      const savedCloudShares = await store.get<Array<{ local_path: string; slug: string }>>("cloud_shares");
+      if (savedCloudShares) setCloudShares(savedCloudShares);
 
       // Restore window size
       const savedWindow = await store.get<{ width: number; height: number }>("windowSize");
@@ -253,6 +256,22 @@ function App() {
   const removeRecentFile = useCallback((filePath: string) => {
     setRecentFiles((prev) => prev.filter((f) => f !== filePath));
   }, []);
+
+  const handleCloudExpose = useCallback(async (folderPath: string) => {
+    try {
+      const result = await invoke<{ url: string; slug: string; share_id: string; files_uploaded: number }>("cloud_expose", {
+        path: folderPath,
+        theme,
+      });
+      setCloudShares((prev) => {
+        const filtered = prev.filter((s) => s.local_path !== folderPath);
+        return [...filtered, { local_path: folderPath, slug: result.slug }];
+      });
+      navigator.clipboard.writeText(result.url).catch(() => {});
+    } catch {
+      // error handled in caller
+    }
+  }, [theme]);
 
   const startResize = useCallback((side: "left" | "right", startX: number) => {
     const startWidth = side === "left" ? leftSidebarWidth : rightSidebarWidth;
@@ -463,6 +482,8 @@ function App() {
                 onAddFolder={addFavoriteFolder}
                 onRemoveFolder={removeFavoriteFolder}
                 onRemoveRecent={removeRecentFile}
+                cloudPaths={cloudShares.map(s => s.local_path)}
+                onCloudExpose={handleCloudExpose}
               />
             </div>
             <div

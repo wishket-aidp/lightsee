@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 interface CloudShareListItem {
   slug: string;
@@ -49,7 +50,7 @@ export default function CloudSharePanel({ theme, activeFilePath, themeName }: Cl
     fetchShares();
   }, [fetchShares]);
 
-  const handleExpose = useCallback(async () => {
+  const handleExposeFile = useCallback(async () => {
     if (!activeFilePath) return;
     setUploading(true);
     setError(null);
@@ -62,6 +63,21 @@ export default function CloudSharePanel({ theme, activeFilePath, themeName }: Cl
       setUploading(false);
     }
   }, [activeFilePath, themeName, fetchShares]);
+
+  const handleExposeFolder = useCallback(async () => {
+    const selected = await openDialog({ directory: true, multiple: false });
+    if (!selected) return;
+    setUploading(true);
+    setError(null);
+    try {
+      await invoke("cloud_expose", { path: selected, theme: themeName });
+      await fetchShares();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setUploading(false);
+    }
+  }, [themeName, fetchShares]);
 
   const handleDelete = useCallback(async (slug: string) => {
     setError(null);
@@ -106,10 +122,18 @@ export default function CloudSharePanel({ theme, activeFilePath, themeName }: Cl
         <button
           className="btn btn-sm"
           style={{ color: theme.text, borderColor: theme.border }}
-          onClick={handleExpose}
+          onClick={handleExposeFile}
           disabled={!activeFilePath || uploading}
         >
-          {uploading ? "Uploading..." : "Share Current File"}
+          {uploading ? "Uploading..." : "Share File"}
+        </button>
+        <button
+          className="btn btn-sm"
+          style={{ color: theme.text, borderColor: theme.border }}
+          onClick={handleExposeFolder}
+          disabled={uploading}
+        >
+          Share Folder
         </button>
         <button
           className="btn btn-sm"
