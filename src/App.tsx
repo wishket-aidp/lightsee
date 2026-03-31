@@ -85,28 +85,30 @@ function App() {
       const store = await load("settings.json");
       storeRef.current = store;
 
+      // Read ALL values first (async), then batch all setState calls (sync)
       const savedTheme = await store.get<ThemeKey>("theme");
-      if (savedTheme && savedTheme in themes) setTheme(savedTheme);
       const savedFontSize = await store.get<number>("fontSize");
-      if (savedFontSize) setFontSize(savedFontSize);
       const savedRecent = await store.get<string[]>("recentFiles");
-      if (savedRecent) setRecentFiles(savedRecent);
-
       const savedLeftOpen = await store.get<boolean>("leftSidebarOpen");
-      if (savedLeftOpen !== null && savedLeftOpen !== undefined) setLeftSidebarOpen(savedLeftOpen);
       const savedRightOpen = await store.get<boolean>("rightSidebarOpen");
-      if (savedRightOpen !== null && savedRightOpen !== undefined) setRightSidebarOpen(savedRightOpen);
       const savedLeftWidth = await store.get<number>("leftSidebarWidth");
-      if (savedLeftWidth) setLeftSidebarWidth(savedLeftWidth);
       const savedRightWidth = await store.get<number>("rightSidebarWidth");
-      if (savedRightWidth) setRightSidebarWidth(savedRightWidth);
       const savedFavFolders = await store.get<string[]>("favoriteFolders");
-      if (savedFavFolders) setFavoriteFolders(savedFavFolders);
       const savedCloudShares = await store.get<Array<{ local_path: string; slug: string }>>("cloud_shares");
+      const savedWindow = await store.get<{ width: number; height: number }>("windowSize");
+
+      // All setState calls in one synchronous block → React 18 batches them
+      if (savedTheme && savedTheme in themes) setTheme(savedTheme);
+      if (savedFontSize) setFontSize(savedFontSize);
+      if (savedRecent) setRecentFiles(savedRecent);
+      if (savedLeftOpen !== null && savedLeftOpen !== undefined) setLeftSidebarOpen(savedLeftOpen);
+      if (savedRightOpen !== null && savedRightOpen !== undefined) setRightSidebarOpen(savedRightOpen);
+      if (savedLeftWidth) setLeftSidebarWidth(savedLeftWidth);
+      if (savedRightWidth) setRightSidebarWidth(savedRightWidth);
+      if (savedFavFolders) setFavoriteFolders(savedFavFolders);
       if (savedCloudShares) setCloudShares(savedCloudShares);
 
       // Restore window size
-      const savedWindow = await store.get<{ width: number; height: number }>("windowSize");
       if (savedWindow) {
         const win = getCurrentWindow();
         await win.setSize(new LogicalSize(savedWindow.width, savedWindow.height));
@@ -134,16 +136,34 @@ function App() {
     };
   }, []);
 
+  // Flush all current settings to disk immediately (bypasses debounce)
+  const flushSettings = useCallback(async () => {
+    const store = storeRef.current;
+    if (!store || !settingsLoaded.current) return;
+    clearTimeout(saveTimer.current);
+    await store.set("theme", theme);
+    await store.set("fontSize", fontSize);
+    await store.set("recentFiles", recentFiles);
+    await store.set("leftSidebarOpen", leftSidebarOpen);
+    await store.set("rightSidebarOpen", rightSidebarOpen);
+    await store.set("leftSidebarWidth", leftSidebarWidth);
+    await store.set("rightSidebarWidth", rightSidebarWidth);
+    await store.set("favoriteFolders", favoriteFolders);
+    await store.save();
+  }, [theme, fontSize, recentFiles, leftSidebarOpen, rightSidebarOpen, leftSidebarWidth, rightSidebarWidth, favoriteFolders]);
+
   const doUpdate = useCallback(async () => {
     if (!updateAvailable) return;
     setUpdating(true);
     try {
+      // Save all settings before update to prevent data loss on relaunch
+      await flushSettings();
       await updateAvailable.downloadAndInstall();
       await relaunch();
     } catch {
       setUpdating(false);
     }
-  }, [updateAvailable]);
+  }, [updateAvailable, flushSettings]);
 
   // Save window size on resize (debounced, uses shared store instance)
   useEffect(() => {
@@ -381,24 +401,16 @@ function App() {
     >
       <header className="toolbar" style={{ borderBottom: `1px solid ${currentTheme.border}` }}>
         <div className="toolbar-left">
-          <button className="btn" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={openFile}>
-            Open File
-          </button>
           <button
             className="btn-icon"
             style={{ color: currentTheme.text, borderColor: currentTheme.border, opacity: leftSidebarOpen ? 1 : 0.4 }}
             onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
             title="Toggle left sidebar"
           >
-            &#9776;
+            {leftSidebarOpen ? "\u25E7" : "\u25A1"}
           </button>
-          <button
-            className="btn-icon"
-            style={{ color: currentTheme.text, borderColor: currentTheme.border, opacity: rightSidebarOpen ? 1 : 0.4 }}
-            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-            title="Toggle right sidebar"
-          >
-            &#8801;
+          <button className="btn" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={openFile}>
+            Open File
           </button>
         </div>
         <div className="toolbar-right">
@@ -430,6 +442,14 @@ function App() {
             onClick={() => setShowThemePanel(!showThemePanel)}
           >
             Theme
+          </button>
+          <button
+            className="btn-icon"
+            style={{ color: currentTheme.text, borderColor: currentTheme.border, opacity: rightSidebarOpen ? 1 : 0.4 }}
+            onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+            title="Toggle right sidebar"
+          >
+            {rightSidebarOpen ? "\u25E8" : "\u25A1"}
           </button>
         </div>
       </header>
