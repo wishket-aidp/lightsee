@@ -7,7 +7,7 @@ const SUPABASE_URL: &str = "https://orrbxkptrkkibggjxhmh.supabase.co";
 const SUPABASE_ANON_KEY: &str = "sb_publishable_XA3MvZtQyzmejLdLavGHeQ_aisNX2Ou";
 const EDGE_FUNCTION_URL: &str = "https://orrbxkptrkkibggjxhmh.supabase.co/functions/v1/issue-api-key";
 const STORAGE_BUCKET: &str = "lightsee-files";
-const PUBLIC_VIEWER_URL: &str = "https://lightsee.vercel.app";
+const PUBLIC_VIEWER_URL: &str = "https://viewer.ai-delivery.work";
 
 const MAX_FILES: usize = 200;
 const MAX_FILE_SIZE: u64 = 5 * 1024 * 1024; // 5MB

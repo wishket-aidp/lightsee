@@ -157,7 +157,7 @@ Lightsee를 MCP 서버로 노출하여 Claude Desktop에서 직접 expose/list/r
 
 ### 26. 커스텀 도메인
 
-`lightsee.vercel.app` 대신 사용자 지정 도메인으로 공유.
+`viewer.ai-delivery.work` 대신 사용자 지정 도메인으로 공유.
 
 ---
 

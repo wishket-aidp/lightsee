@@ -133,7 +133,7 @@ Light, Dark, Sepia, Nord, Solarized, Dracula, GitHub, Monokai, Catppuccin Mocha/
 
 | 항목 | 설명 |
 |------|------|
-| URL 생성 | nanoid 10자리 slug → `https://lightsee.vercel.app/s/{slug}` |
+| URL 생성 | nanoid 10자리 slug → `https://viewer.ai-delivery.work/s/{slug}` |
 | 재업로드 | 같은 경로 재 expose 시 기존 URL 유지, 콘텐츠만 갱신 |
 | 파일 제한 | 폴더당 최대 200개 파일 |
 | 크기 제한 | 파일당 최대 5MB |
@@ -172,7 +172,7 @@ lightsee remove <slug>    # 공유 삭제
 
 ---
 
-## 6. 웹 뷰어 (lightsee.vercel.app)
+## 6. 웹 뷰어 (viewer.ai-delivery.work)
 
 ### 6.1 URL 구조
 

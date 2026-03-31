@@ -46,7 +46,7 @@ lightsee expose ./내폴더
 업로드가 완료되면 공유 URL이 출력됩니다:
 
 ```
-Uploaded 12 file(s). Share URL: https://lightsee.vercel.app/s/abc123
+Uploaded 12 file(s). Share URL: https://viewer.ai-delivery.work/s/abc123
 ```
 
 이 URL을 전달하면 됩니다. 받는 사람은 폴더 구조를 탐색하며 각 문서를 볼 수 있습니다.
