@@ -1,8 +1,9 @@
+mod cloud;
 mod share;
 
 use std::sync::{Arc, Mutex};
 
-fn normalize_path(path: &std::path::Path) -> String {
+pub(crate) fn normalize_path(path: &std::path::Path) -> String {
     let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let s = resolved.to_string_lossy().to_string();
     #[cfg(target_os = "windows")]
@@ -10,7 +11,7 @@ fn normalize_path(path: &std::path::Path) -> String {
     s
 }
 
-fn is_markdown_ext(path: &std::path::Path) -> bool {
+pub(crate) fn is_markdown_ext(path: &std::path::Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(|ext| matches!(ext.to_lowercase().as_str(), "md" | "markdown" | "mdown" | "mkd" | "mdwn"))
@@ -150,7 +151,8 @@ pub fn run() {
         .manage(share::ShareManager::new())
         .invoke_handler(tauri::generate_handler![
             get_pending_files, read_file, list_markdown_files,
-            start_sharing, stop_sharing, update_shared_content, get_share_status
+            start_sharing, stop_sharing, update_shared_content, get_share_status,
+            cloud::cloud_expose, cloud::cloud_list, cloud::cloud_remove
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
