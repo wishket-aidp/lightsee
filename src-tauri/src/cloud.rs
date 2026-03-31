@@ -3,9 +3,9 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tauri_plugin_store::StoreExt;
 
-const SUPABASE_URL: &str = "https://PLACEHOLDER.supabase.co";
-const SUPABASE_ANON_KEY: &str = "PLACEHOLDER";
-const EDGE_FUNCTION_URL: &str = "https://PLACEHOLDER.supabase.co/functions/v1/issue-api-key";
+const SUPABASE_URL: &str = "https://orrbxkptrkkibggjxhmh.supabase.co";
+const SUPABASE_ANON_KEY: &str = "sb_publishable_XA3MvZtQyzmejLdLavGHeQ_aisNX2Ou";
+const EDGE_FUNCTION_URL: &str = "https://orrbxkptrkkibggjxhmh.supabase.co/functions/v1/issue-api-key";
 const STORAGE_BUCKET: &str = "lightsee-files";
 const PUBLIC_VIEWER_URL: &str = "https://lightsee.vercel.app";
 
@@ -123,7 +123,6 @@ fn ensure_api_key(app: &tauri::AppHandle) -> Result<CloudCredentials, String> {
     let resp = client
         .post(EDGE_FUNCTION_URL)
         .header("apikey", SUPABASE_ANON_KEY)
-        .header("Authorization", format!("Bearer {}", SUPABASE_ANON_KEY))
         .header("Content-Type", "application/json")
         .body("{}")
         .send()
@@ -301,7 +300,7 @@ fn cloud_expose_inner(
                 creds.api_key_id
             ))
             .header("apikey", SUPABASE_ANON_KEY)
-            .header("Authorization", format!("Bearer {}", SUPABASE_ANON_KEY))
+
             .header("Content-Type", "application/json")
             .header("Prefer", "return=representation")
             .header("x-api-key-hash", &key_hash)
@@ -330,7 +329,7 @@ fn cloud_expose_inner(
         let resp = client
             .post(supabase_rest_url("shares"))
             .header("apikey", SUPABASE_ANON_KEY)
-            .header("Authorization", format!("Bearer {}", SUPABASE_ANON_KEY))
+
             .header("Content-Type", "application/json")
             .header("Prefer", "return=representation")
             .header("x-api-key-hash", &key_hash)
@@ -388,7 +387,7 @@ fn cloud_expose_inner(
         let resp = client
             .post(&storage_url(&storage_path))
             .header("apikey", SUPABASE_ANON_KEY)
-            .header("Authorization", format!("Bearer {}", SUPABASE_ANON_KEY))
+
             .header("Content-Type", "text/markdown")
             .header("x-upsert", "true")
             .body(content)
@@ -414,7 +413,7 @@ fn cloud_expose_inner(
         let resp = client
             .post(supabase_rest_url("share_files"))
             .header("apikey", SUPABASE_ANON_KEY)
-            .header("Authorization", format!("Bearer {}", SUPABASE_ANON_KEY))
+
             .header("Content-Type", "application/json")
             .header("x-api-key-hash", &key_hash)
             .json(&file_record)
@@ -577,7 +576,7 @@ fn cloud_remove_inner(app: &tauri::AppHandle, slug: &str) -> Result<(), String> 
                 let _ = client
                     .delete(&storage_url(&file.storage_path))
                     .header("apikey", SUPABASE_ANON_KEY)
-                    .header("Authorization", format!("Bearer {}", SUPABASE_ANON_KEY))
+        
                     .send();
             }
         }

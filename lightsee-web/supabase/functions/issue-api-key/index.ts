@@ -18,9 +18,18 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Support both legacy and new Supabase key env var names
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY");
+  if (!serviceKey) {
+    return new Response(JSON.stringify({ error: "Server misconfigured: no service key" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    serviceKey,
   );
 
   // Generate a random API key
