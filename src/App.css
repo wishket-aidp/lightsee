@@ -462,6 +462,32 @@ html, body, #root {
   background-color: var(--code-bg);
 }
 
+.folder-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.folder-action-btn {
+  background: none;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  padding: 0 3px;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.folder-header:hover .folder-action-btn {
+  opacity: 0.5;
+}
+
+.folder-action-btn:hover {
+  opacity: 1 !important;
+}
+
 .folder-remove {
   background: none;
   border: none;

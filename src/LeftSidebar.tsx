@@ -24,6 +24,7 @@ interface LeftSidebarProps {
   onRemoveFolder: (folderPath: string) => void;
   onRemoveRecent: (filePath: string) => void;
   cloudPaths: string[];
+  onCloudExpose: (folderPath: string) => void;
 }
 
 function FileTree({
@@ -94,9 +95,11 @@ export default function LeftSidebar({
   onRemoveFolder,
   onRemoveRecent,
   cloudPaths,
+  onCloudExpose,
 }: LeftSidebarProps) {
   const [folderTrees, setFolderTrees] = useState<Map<string, FileEntry[]>>(new Map());
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set(favoriteFolders));
+  const [exposingFolder, setExposingFolder] = useState<string | null>(null);
 
   // Load folder trees when favoriteFolders changes
   useEffect(() => {
@@ -134,6 +137,23 @@ export default function LeftSidebar({
       return next;
     });
   };
+
+  const refreshFolder = useCallback(async (folder: string) => {
+    try {
+      const entries = await invoke<FileEntry[]>("list_markdown_files", { path: folder });
+      setFolderTrees((prev) => {
+        const next = new Map(prev);
+        next.set(folder, entries);
+        return next;
+      });
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleCloudExpose = useCallback(async (folder: string) => {
+    setExposingFolder(folder);
+    onCloudExpose(folder);
+    setExposingFolder(null);
+  }, [onCloudExpose]);
 
   const handleAddFolder = useCallback(async () => {
     const selected = await openDialog({
@@ -190,15 +210,38 @@ export default function LeftSidebar({
                     <span style={{ marginLeft: "4px", opacity: 0.6 }} title="Cloud shared">&#x2601;</span>
                   )}
                 </span>
-                <button
-                  className="folder-remove"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveFolder(folder);
-                  }}
-                >
-                  x
-                </button>
+                <span className="folder-actions">
+                  <button
+                    className="folder-action-btn"
+                    title="Refresh file list"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      refreshFolder(folder);
+                    }}
+                  >
+                    &#x21BB;
+                  </button>
+                  <button
+                    className="folder-action-btn"
+                    title={cloudPaths.includes(folder) ? "Update cloud share" : "Share to cloud"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCloudExpose(folder);
+                    }}
+                    disabled={exposingFolder === folder}
+                  >
+                    {exposingFolder === folder ? "..." : "\u2601"}
+                  </button>
+                  <button
+                    className="folder-remove"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveFolder(folder);
+                    }}
+                  >
+                    x
+                  </button>
+                </span>
               </div>
               {isOpen && <FileTree entries={tree} depth={1} theme={theme} onOpenFile={onOpenFile} />}
             </div>

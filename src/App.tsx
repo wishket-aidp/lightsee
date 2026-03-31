@@ -76,7 +76,7 @@ function App() {
   const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
   const [cloudShares, setCloudShares] = useState<Array<{ local_path: string; slug: string }>>([]);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const settingsLoaded = useRef(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const currentTheme = themes[theme];
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
@@ -111,7 +111,7 @@ function App() {
         const win = getCurrentWindow();
         await win.setSize(new LogicalSize(savedWindow.width, savedWindow.height));
       }
-      settingsLoaded.current = true;
+      setSettingsLoaded(true);
     })();
   }, []);
 
@@ -154,7 +154,7 @@ function App() {
 
   // Save settings to store on change (only after initial load)
   useEffect(() => {
-    if (!settingsLoaded.current) return;
+    if (!settingsLoaded) return;
     (async () => {
       const store = await load("settings.json");
       await store.set("theme", theme);
@@ -256,6 +256,23 @@ function App() {
   const removeRecentFile = useCallback((filePath: string) => {
     setRecentFiles((prev) => prev.filter((f) => f !== filePath));
   }, []);
+
+  const handleCloudExpose = useCallback(async (folderPath: string) => {
+    try {
+      const result = await invoke<{ url: string; slug: string; share_id: string; files_uploaded: number }>("cloud_expose", {
+        path: folderPath,
+        theme,
+      });
+      setCloudShares((prev) => {
+        const filtered = prev.filter((s) => s.local_path !== folderPath);
+        return [...filtered, { local_path: folderPath, slug: result.slug }];
+      });
+      navigator.clipboard.writeText(result.url).catch(() => {});
+      alert(`Uploaded ${result.files_uploaded} file(s).\nURL copied: ${result.url}`);
+    } catch (e) {
+      alert(`Cloud share failed: ${e}`);
+    }
+  }, [theme]);
 
   const startResize = useCallback((side: "left" | "right", startX: number) => {
     const startWidth = side === "left" ? leftSidebarWidth : rightSidebarWidth;
@@ -489,6 +506,7 @@ function App() {
                 onRemoveFolder={removeFavoriteFolder}
                 onRemoveRecent={removeRecentFile}
                 cloudPaths={cloudShares.map(s => s.local_path)}
+                onCloudExpose={handleCloudExpose}
               />
             </div>
             <div
