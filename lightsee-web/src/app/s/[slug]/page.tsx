@@ -7,6 +7,7 @@ import MarkdownViewer from "@/components/MarkdownViewer";
 import TableOfContents from "@/components/TableOfContents";
 import DirectoryTree from "@/components/DirectoryTree";
 import HtmlExportButton from "@/components/HtmlExportButton";
+import MobileDrawer from "@/components/MobileDrawer";
 
 export default async function SharePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -77,6 +78,17 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
           </div>
         )}
       </div>
+
+      {isFolder && (
+        <MobileDrawer side="left" icon="📁" theme={theme}>
+          <DirectoryTree files={typedFiles} currentPath={firstFile.path} slug={slug} theme={theme} />
+        </MobileDrawer>
+      )}
+      {headings.length > 0 && (
+        <MobileDrawer side="right" icon="☰" theme={theme}>
+          <TableOfContents headings={headings} theme={theme} />
+        </MobileDrawer>
+      )}
     </div>
   );
 }

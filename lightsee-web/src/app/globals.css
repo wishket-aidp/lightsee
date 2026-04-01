@@ -93,10 +93,18 @@
 }
 
 /* Mobile responsive */
+.mobile-drawer-btn {
+  display: none !important;
+}
+
 @media (max-width: 768px) {
   .dir-sidebar,
   .toc-sidebar {
     display: none !important;
+  }
+
+  .mobile-drawer-btn {
+    display: flex !important;
   }
 
   .markdown-body {

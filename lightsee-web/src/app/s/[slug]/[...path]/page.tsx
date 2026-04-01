@@ -7,6 +7,7 @@ import MarkdownViewer from "@/components/MarkdownViewer";
 import TableOfContents from "@/components/TableOfContents";
 import DirectoryTree from "@/components/DirectoryTree";
 import HtmlExportButton from "@/components/HtmlExportButton";
+import MobileDrawer from "@/components/MobileDrawer";
 
 export default async function ShareFilePage({
   params,
@@ -77,6 +78,15 @@ export default async function ShareFilePage({
           </div>
         )}
       </div>
+
+      <MobileDrawer side="left" icon="📁" theme={theme}>
+        <DirectoryTree files={typedFiles} currentPath={filePath} slug={slug} theme={theme} />
+      </MobileDrawer>
+      {headings.length > 0 && (
+        <MobileDrawer side="right" icon="☰" theme={theme}>
+          <TableOfContents headings={headings} theme={theme} />
+        </MobileDrawer>
+      )}
     </div>
   );
 }
