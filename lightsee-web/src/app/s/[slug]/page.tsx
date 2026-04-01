@@ -54,7 +54,7 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
           fontSize: "14px",
         }}
       >
-        <span style={{ fontWeight: 600 }}>
+        <span className="viewer-header-title" style={{ fontWeight: 600 }}>
           {isFolder ? "📁" : "📄"} {typedShare.title}
         </span>
         <HtmlExportButton html={html} title={firstFile.path} theme={theme} />
@@ -62,15 +62,17 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
 
       <div style={{ display: "flex", flex: 1 }}>
         {isFolder && (
-          <DirectoryTree files={typedFiles} currentPath={firstFile.path} slug={slug} theme={theme} />
+          <div className="dir-sidebar">
+            <DirectoryTree files={typedFiles} currentPath={firstFile.path} slug={slug} theme={theme} />
+          </div>
         )}
 
-        <main style={{ flex: 1, overflow: "auto" }}>
+        <main style={{ flex: 1, overflow: "auto", minWidth: 0 }}>
           <MarkdownViewer html={html} theme={theme} />
         </main>
 
         {headings.length > 0 && (
-          <div style={{ width: "220px", minWidth: "220px" }}>
+          <div className="toc-sidebar" style={{ width: "220px", minWidth: "220px" }}>
             <TableOfContents headings={headings} theme={theme} />
           </div>
         )}

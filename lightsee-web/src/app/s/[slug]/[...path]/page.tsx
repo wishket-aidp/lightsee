@@ -58,19 +58,21 @@ export default async function ShareFilePage({
           fontSize: "14px",
         }}
       >
-        <span style={{ fontWeight: 600 }}>📁 {typedShare.title} / {filePath}</span>
+        <span className="viewer-header-title" style={{ fontWeight: 600 }}>📁 {typedShare.title} / {filePath}</span>
         <HtmlExportButton html={html} title={targetFile.path} theme={theme} />
       </header>
 
       <div style={{ display: "flex", flex: 1 }}>
-        <DirectoryTree files={typedFiles} currentPath={filePath} slug={slug} theme={theme} />
+        <div className="dir-sidebar">
+          <DirectoryTree files={typedFiles} currentPath={filePath} slug={slug} theme={theme} />
+        </div>
 
-        <main style={{ flex: 1, overflow: "auto" }}>
+        <main style={{ flex: 1, overflow: "auto", minWidth: 0 }}>
           <MarkdownViewer html={html} theme={theme} />
         </main>
 
         {headings.length > 0 && (
-          <div style={{ width: "220px", minWidth: "220px" }}>
+          <div className="toc-sidebar" style={{ width: "220px", minWidth: "220px" }}>
             <TableOfContents headings={headings} theme={theme} />
           </div>
         )}

@@ -91,3 +91,22 @@
 .table-wrapper {
   overflow-x: auto;
 }
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .dir-sidebar,
+  .toc-sidebar {
+    display: none !important;
+  }
+
+  .markdown-body {
+    padding: 16px 16px !important;
+  }
+
+  .viewer-header-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+}
