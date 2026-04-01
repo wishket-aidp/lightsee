@@ -745,4 +745,95 @@ mod tests {
 
         fs::remove_dir_all(&dir).unwrap();
     }
+
+    // ── ascii_safe_segment ────────────────────────────────────────────
+
+    #[test]
+    fn ascii_safe_segment_ascii_passthrough() {
+        assert_eq!(ascii_safe_segment("hello.md"), "hello.md");
+        assert_eq!(ascii_safe_segment("README"), "README");
+        assert_eq!(ascii_safe_segment("my-file_v2.markdown"), "my-file_v2.markdown");
+    }
+
+    #[test]
+    fn ascii_safe_segment_non_ascii_hashed() {
+        let result = ascii_safe_segment("한글파일.md");
+        // Should be 16-char hash + .md extension
+        assert!(result.ends_with(".md"), "expected .md extension, got: {}", result);
+        assert_eq!(result.len(), 16 + 3); // 16 hex chars + ".md"
+        assert!(result.is_ascii());
+    }
+
+    #[test]
+    fn ascii_safe_segment_non_ascii_consistent() {
+        let a = ascii_safe_segment("한글파일.md");
+        let b = ascii_safe_segment("한글파일.md");
+        assert_eq!(a, b, "same input should produce same output");
+    }
+
+    #[test]
+    fn ascii_safe_segment_different_non_ascii_different_hash() {
+        let a = ascii_safe_segment("파일1.md");
+        let b = ascii_safe_segment("파일2.md");
+        assert_ne!(a, b, "different inputs should produce different hashes");
+    }
+
+    #[test]
+    fn ascii_safe_segment_non_ascii_no_extension() {
+        let result = ascii_safe_segment("한글폴더");
+        assert_eq!(result.len(), 16);
+        assert!(result.is_ascii());
+    }
+
+    #[test]
+    fn ascii_safe_segment_non_ascii_extension() {
+        // If the extension itself is non-ASCII, it should be dropped
+        let result = ascii_safe_segment("파일.한글");
+        assert_eq!(result.len(), 16);
+        assert!(result.is_ascii());
+    }
+
+    // ── collect_markdown_files recursive ──────────────────────────────
+
+    #[test]
+    fn collect_markdown_files_recursive_subdirs() {
+        let dir = create_temp_dir("collect_recursive");
+        fs::write(dir.join("top.md"), "top").unwrap();
+        let sub = dir.join("sub");
+        fs::create_dir_all(&sub).unwrap();
+        fs::write(sub.join("nested.md"), "nested").unwrap();
+        let deep = sub.join("deep");
+        fs::create_dir_all(&deep).unwrap();
+        fs::write(deep.join("deep.md"), "deep").unwrap();
+
+        let files = collect_markdown_files(&dir);
+        assert_eq!(files.len(), 3);
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn collect_markdown_files_empty_dir() {
+        let dir = create_temp_dir("collect_empty");
+        let files = collect_markdown_files(&dir);
+        assert!(files.is_empty());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // ── hash_api_key edge cases ──────────────────────────────────────
+
+    #[test]
+    fn hash_api_key_empty_string() {
+        let hash = hash_api_key("");
+        assert_eq!(hash.len(), 64);
+        // SHA-256 of empty string is a known value
+        assert_eq!(hash, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    }
+
+    #[test]
+    fn hash_api_key_different_inputs() {
+        let h1 = hash_api_key("key1");
+        let h2 = hash_api_key("key2");
+        assert_ne!(h1, h2);
+    }
 }

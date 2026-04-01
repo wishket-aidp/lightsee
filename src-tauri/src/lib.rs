@@ -393,4 +393,105 @@ mod tests {
         let result = read_file("/tmp/lightsee_nonexistent_12345.md".to_string());
         assert!(result.is_err());
     }
+
+    // ── is_markdown_ext edge cases ────────────────────────────────────
+
+    #[test]
+    fn is_markdown_ext_case_insensitive() {
+        assert!(is_markdown_ext(&PathBuf::from("file.MD")));
+        assert!(is_markdown_ext(&PathBuf::from("file.Md")));
+        assert!(is_markdown_ext(&PathBuf::from("file.MARKDOWN")));
+    }
+
+    #[test]
+    fn is_markdown_ext_no_extension() {
+        assert!(!is_markdown_ext(&PathBuf::from("README")));
+        assert!(!is_markdown_ext(&PathBuf::from(".")));
+    }
+
+    #[test]
+    fn is_markdown_ext_double_extension() {
+        // Only checks the final extension
+        assert!(is_markdown_ext(&PathBuf::from("file.txt.md")));
+        assert!(!is_markdown_ext(&PathBuf::from("file.md.txt")));
+    }
+
+    // ── scan_markdown_dir additional tests ────────────────────────────
+
+    #[test]
+    fn scan_markdown_dir_sorts_dirs_before_files() {
+        let dir = create_temp_dir("scan_sort");
+        fs::write(dir.join("z_file.md"), "file").unwrap();
+        let subdir = dir.join("a_dir");
+        fs::create_dir_all(&subdir).unwrap();
+        fs::write(subdir.join("inner.md"), "inner").unwrap();
+
+        let entries = scan_markdown_dir(&dir);
+        assert_eq!(entries.len(), 2);
+        // Directory should come first
+        assert!(entries[0].is_dir, "first entry should be directory");
+        assert_eq!(entries[0].name, "a_dir");
+        assert!(!entries[1].is_dir, "second entry should be file");
+        assert_eq!(entries[1].name, "z_file.md");
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn scan_markdown_dir_sorts_alphabetically() {
+        let dir = create_temp_dir("scan_alpha");
+        fs::write(dir.join("charlie.md"), "c").unwrap();
+        fs::write(dir.join("alpha.md"), "a").unwrap();
+        fs::write(dir.join("bravo.md"), "b").unwrap();
+
+        let entries = scan_markdown_dir(&dir);
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].name, "alpha.md");
+        assert_eq!(entries[1].name, "bravo.md");
+        assert_eq!(entries[2].name, "charlie.md");
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn scan_markdown_dir_ignores_non_markdown() {
+        let dir = create_temp_dir("scan_nonmd");
+        fs::write(dir.join("doc.md"), "md").unwrap();
+        fs::write(dir.join("image.png"), "png").unwrap();
+        fs::write(dir.join("script.js"), "js").unwrap();
+        fs::write(dir.join("style.css"), "css").unwrap();
+
+        let entries = scan_markdown_dir(&dir);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "doc.md");
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // ── read_file additional tests ────────────────────────────────────
+
+    #[test]
+    fn read_file_utf8_content() {
+        let dir = create_temp_dir("read_utf8");
+        let path = dir.join("korean.md");
+        fs::write(&path, "# 한글 제목\n\n본문 내용").unwrap();
+
+        let result = read_file(path.to_string_lossy().to_string());
+        assert!(result.is_ok());
+        assert!(result.unwrap().contains("한글 제목"));
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn read_file_empty_file() {
+        let dir = create_temp_dir("read_empty");
+        let path = dir.join("empty.md");
+        fs::write(&path, "").unwrap();
+
+        let result = read_file(path.to_string_lossy().to_string());
+        assert_eq!(result.unwrap(), "");
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
 }
