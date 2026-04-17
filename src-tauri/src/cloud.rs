@@ -395,7 +395,7 @@ fn cloud_expose_inner(
     let base_dir = if dir.is_dir() { dir } else { dir.parent().unwrap_or(dir) };
     let mut files_uploaded = 0;
 
-    for file_path in &files {
+    for (i, file_path) in files.iter().enumerate() {
         let content = std::fs::read_to_string(file_path)
             .map_err(|e| format!("Failed to read {}: {}", file_path.display(), e))?;
 
@@ -415,9 +415,13 @@ fn cloud_expose_inner(
 
         let storage_path = format!("{}/{}", share_id, safe_rel_path);
 
+        eprintln!("[cloud_expose] [{}/{}] uploading: rel_path={:?} storage_path={:?}", i + 1, files.len(), rel_path, storage_path);
+
         // Upload to Supabase Storage
+        let upload_url = storage_url(&storage_path);
+        eprintln!("[cloud_expose] [{}/{}] POST {}", i + 1, files.len(), upload_url);
         let resp = client
-            .post(&storage_url(&storage_path))
+            .post(&upload_url)
             .header("apikey", SUPABASE_ANON_KEY)
 
             .header("Content-Type", "text/markdown")
@@ -426,12 +430,14 @@ fn cloud_expose_inner(
             .send()
             .map_err(|e| format!("Failed to upload {}: {}", rel_path, e))?;
 
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let text = resp.text().unwrap_or_default();
+        let upload_status = resp.status();
+        let upload_body = resp.text().unwrap_or_default();
+        eprintln!("[cloud_expose] [{}/{}] upload response: {} {}", i + 1, files.len(), upload_status, upload_body);
+
+        if !upload_status.is_success() {
             return Err(format!(
                 "Failed to upload {} ({}): {}",
-                rel_path, status, text
+                rel_path, upload_status, upload_body
             ));
         }
 
@@ -443,6 +449,7 @@ fn cloud_expose_inner(
             "size_bytes": std::fs::metadata(file_path).map(|m| m.len()).unwrap_or(0),
         });
 
+        eprintln!("[cloud_expose] [{}/{}] inserting share_files record: {:?}", i + 1, files.len(), file_record);
         let resp = client
             .post(supabase_rest_url("share_files"))
             .header("apikey", SUPABASE_ANON_KEY)
@@ -453,12 +460,14 @@ fn cloud_expose_inner(
             .send()
             .map_err(|e| format!("Failed to insert file record: {}", e))?;
 
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let text = resp.text().unwrap_or_default();
+        let insert_status = resp.status();
+        let insert_body = resp.text().unwrap_or_default();
+        eprintln!("[cloud_expose] [{}/{}] insert response: {} {}", i + 1, files.len(), insert_status, insert_body);
+
+        if !insert_status.is_success() {
             return Err(format!(
                 "Failed to insert file record ({}): {}",
-                status, text
+                insert_status, insert_body
             ));
         }
 

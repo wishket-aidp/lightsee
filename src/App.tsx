@@ -304,8 +304,8 @@ function App() {
         return [...filtered, { local_path: folderPath, slug: result.slug }];
       });
       navigator.clipboard.writeText(result.url).catch(() => {});
-    } catch {
-      // error handled in caller
+    } catch (e) {
+      console.error("[cloud_expose] failed:", e);
     }
   }, [theme]);
 
