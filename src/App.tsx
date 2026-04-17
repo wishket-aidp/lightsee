@@ -36,6 +36,9 @@ const themes = {
   gradMidnightBlue: { name: "Midnight Blue", bg: "#282839", text: "#d4d4d4", heading: "#e2e2e2", link: "#ede891", codeBg: "#3d3d56", border: "#221b3c", blockquoteBorder: "#6b53a5", blockquoteText: "#9a9aac" },
   // Monocai
   monocai: { name: "Monocai", bg: "#2d2a2f", text: "#fcfcfb", heading: "#fcfcfb", link: "#78dce9", codeBg: "#403e42", border: "#7f7e7f", blockquoteBorder: "#ab9df3", blockquoteText: "#727072" },
+  // Everforest
+  everforestDark: { name: "Everforest Dark", bg: "#2d353b", text: "#d3c6aa", heading: "#d3c6aa", link: "#7fbbb3", codeBg: "#343f44", border: "#475258", blockquoteBorder: "#a7c080", blockquoteText: "#859289" },
+  everforestLight: { name: "Everforest Light", bg: "#fdf6e3", text: "#5c6a72", heading: "#5c6a72", link: "#35a77c", codeBg: "#f0e4ca", border: "#e0dcc7", blockquoteBorder: "#8da101", blockquoteText: "#939f91" },
 } as const;
 
 type ThemeKey = keyof typeof themes;

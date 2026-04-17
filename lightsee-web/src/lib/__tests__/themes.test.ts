@@ -6,6 +6,7 @@ const EXPECTED_THEME_KEYS = [
   'light', 'dark', 'sepia', 'nord', 'solarized', 'dracula', 'github', 'monokai',
   'catMocha', 'catMacchiato', 'catFrappe', 'catLatte',
   'gradDeepOcean', 'gradNatureGreen', 'gradDarkFuchsia', 'gradMidnightBlue', 'monocai',
+  'everforestDark', 'everforestLight',
 ];
 
 const REQUIRED_COLOR_PROPS: (keyof ThemeColors)[] = [
@@ -13,8 +14,8 @@ const REQUIRED_COLOR_PROPS: (keyof ThemeColors)[] = [
 ];
 
 describe('themes', () => {
-  it('all themes present — themes object has all 17 expected keys', () => {
-    expect(Object.keys(themes)).toHaveLength(17);
+  it('all themes present — themes object has all 19 expected keys', () => {
+    expect(Object.keys(themes)).toHaveLength(19);
     for (const key of EXPECTED_THEME_KEYS) {
       expect(themes).toHaveProperty(key);
     }
