@@ -255,6 +255,29 @@ function App() {
     }
   }, [openFilePath]);
 
+  const refreshActiveTab = useCallback(async () => {
+    const tab = tabs.find((t) => t.id === activeTabId);
+    if (!tab?.filePath) return;
+    const content = await invoke<string>("read_file", { path: tab.filePath });
+    const raw = marked.parse(content, { async: false }) as string;
+    const sanitized = DOMPurify.sanitize(raw);
+    const wrapped = sanitized.replace(/<table([\s\S]*?<\/table>)/g, '<div class="table-wrapper"><table$1</div>');
+    const headings: Heading[] = [];
+    const slugCounts = new Map<string, number>();
+    const html = wrapped.replace(/<(h[1-6])([^>]*)>([\s\S]*?)<\/\1>/gi, (_match, tag, attrs, content) => {
+      const text = content.replace(/<[^>]*>/g, "").trim();
+      let slug = text.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+      if (!slug) slug = "heading";
+      const count = slugCounts.get(slug) || 0;
+      slugCounts.set(slug, count + 1);
+      const finalSlug = count > 0 ? `${slug}-${count}` : slug;
+      const level = parseInt(tag[1], 10);
+      headings.push({ id: finalSlug, text, level });
+      return `<${tag}${attrs} id="${finalSlug}">${content}</${tag}>`;
+    });
+    setTabs((prev) => prev.map((t) => t.id === tab.id ? { ...t, html, headings } : t));
+  }, [tabs, activeTabId]);
+
   const closeTab = useCallback((id: string) => {
     setTabs((prev) => {
       const next = prev.filter((t) => t.id !== id);
@@ -429,6 +452,15 @@ function App() {
             <span style={{ fontSize: "12px", minWidth: "28px", textAlign: "center" }}>{fontSize}px</span>
             <button className="btn btn-sm" style={{ color: currentTheme.text, borderColor: currentTheme.border }} onClick={() => setFontSize((s) => Math.min(s + 2, 32))}>A+</button>
           </div>
+          <button
+            className="btn btn-sm"
+            style={{ color: currentTheme.text, borderColor: currentTheme.border, marginRight: "8px" }}
+            onClick={refreshActiveTab}
+            title="Refresh (re-read file)"
+            disabled={!tabs.find((t) => t.id === activeTabId)?.filePath}
+          >
+            ↻
+          </button>
           <button
             className="btn"
             style={{ color: currentTheme.text, borderColor: currentTheme.border }}
